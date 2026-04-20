@@ -1,5 +1,5 @@
-import { formatJobForPlatform } from '../../src/application/formatters/job-formatter';
-import { Job } from '../../src/domain/models/job';
+import { formatJobForPlatform } from '../../src/usecases/formatJob/formatJobForPlatform';
+import { Job } from '../../src/entities/job';
 
 const mockJob: Job = {
   id: 'job-1',

@@ -1,10 +1,10 @@
 import request from 'supertest';
 import express from 'express';
-import { createRoutes } from '../../src/api/routes';
-import { errorHandler } from '../../src/api/middleware/error-handler';
-import { createInMemoryJobRepository } from '../../src/infrastructure/repositories/in-memory-job-repository';
-import { createInMemoryJobApplicationRepository } from '../../src/infrastructure/repositories/in-memory-job-application-repository';
-import { NotificationPort } from '../../src/domain/ports/notification-port';
+import { createRouter } from '../../src/application/router';
+import { errorHandler } from '../../src/application/middleware/errorHandlerMiddleware';
+import { createInMemoryJobRepository } from '../../src/infrastructure/jobs/inMemoryJobRepository';
+import { createInMemoryJobApplicationRepository } from '../../src/infrastructure/jobApplications/inMemoryJobApplicationRepository';
+import { NotificationPort } from '../../src/entities/ports/notificationPort';
 
 const createTestApp = () => {
   const app = express();
@@ -16,7 +16,7 @@ const createTestApp = () => {
     send: jest.fn().mockResolvedValue({ data: {}, status: 200, statusText: 'OK', headers: {}, config: {} }),
   };
 
-  const routes = createRoutes({ jobRepository, applicationRepository, notificationPort });
+  const routes = createRouter({ jobRepository, applicationRepository, notificationPort });
   app.use('/api', routes);
   app.use(errorHandler);
 

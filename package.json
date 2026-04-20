@@ -4,8 +4,8 @@
   "description": "A SEEK-like job posting service — with some hidden clean architecture violations",
   "main": "dist/server.js",
   "scripts": {
-    "start": "ts-node src/server.ts",
-    "dev": "ts-node-dev --respawn src/server.ts",
+    "start": "ts-node src/listen.ts",
+    "dev": "ts-node-dev --respawn src/listen.ts",
     "test": "jest",
     "test:watch": "jest --watch"
   },

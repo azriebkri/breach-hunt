@@ -1,7 +1,12 @@
-import { createJobService } from '../../src/application/services/job-service';
-import { JobRepository } from '../../src/domain/ports/job-repository';
-import { Job } from '../../src/domain/models/job';
-import { HttpError } from '../../src/api/middleware/error-handler';
+import { createCreateJobInteractor } from '../../src/usecases/createJob/createJobInteractor';
+import { createListJobsInteractor } from '../../src/usecases/listJobs/listJobsInteractor';
+import { createGetJobInteractor } from '../../src/usecases/getJob/getJobInteractor';
+import { createSearchJobsInteractor } from '../../src/usecases/searchJobs/searchJobsInteractor';
+import { createUpdateJobInteractor } from '../../src/usecases/updateJob/updateJobInteractor';
+import { createDeleteJobInteractor } from '../../src/usecases/deleteJob/deleteJobInteractor';
+import { JobRepository } from '../../src/entities/ports/jobRepository';
+import { Job } from '../../src/entities/job';
+import { HttpError } from '../../src/application/middleware/errorHandlerMiddleware';
 
 const mockJob: Job = {
   id: 'job-1',
@@ -25,31 +30,30 @@ const mockJobRepository: jest.Mocked<JobRepository> = {
   getAverageSalary: jest.fn(),
 };
 
-describe('JobService', () => {
-  let jobService: ReturnType<typeof createJobService>;
-
+describe('Job interactors', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jobService = createJobService(mockJobRepository);
   });
 
-  describe('getAllJobs', () => {
+  describe('listJobsInteractor.getAllJobs', () => {
     it('should return all jobs from the repository', async () => {
       const jobs = [mockJob];
       mockJobRepository.findAll.mockResolvedValue(jobs);
 
-      const result = await jobService.getAllJobs();
+      const { getAllJobs } = createListJobsInteractor(mockJobRepository);
+      const result = await getAllJobs();
 
       expect(result).toEqual(jobs);
       expect(mockJobRepository.findAll).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('getJobById', () => {
+  describe('getJobInteractor.getJobById', () => {
     it('should return a job when it exists', async () => {
       mockJobRepository.findById.mockResolvedValue(mockJob);
 
-      const result = await jobService.getJobById('job-1');
+      const { getJobById } = createGetJobInteractor(mockJobRepository);
+      const result = await getJobById('job-1');
 
       expect(result).toEqual(mockJob);
       expect(mockJobRepository.findById).toHaveBeenCalledWith('job-1');
@@ -58,15 +62,18 @@ describe('JobService', () => {
     it('should throw when job is not found', async () => {
       mockJobRepository.findById.mockResolvedValue(undefined);
 
-      await expect(jobService.getJobById('missing-id')).rejects.toThrow(HttpError);
+      const { getJobById } = createGetJobInteractor(mockJobRepository);
+
+      await expect(getJobById('missing-id')).rejects.toThrow(HttpError);
     });
   });
 
-  describe('addJob', () => {
+  describe('createJobInteractor.addJob', () => {
     it('should create and save a new job', async () => {
       mockJobRepository.save.mockImplementation(async (job) => job);
 
-      const result = await jobService.addJob({
+      const { addJob } = createCreateJobInteractor(mockJobRepository);
+      const result = await addJob({
         title: 'Frontend Developer',
         description: 'React wizardry',
         company: 'SEEK',
@@ -81,7 +88,7 @@ describe('JobService', () => {
     });
   });
 
-  describe('searchJobs', () => {
+  describe('searchJobsInteractor.searchJobs', () => {
     it('should filter jobs by location', async () => {
       const jobs: Job[] = [
         { ...mockJob, id: '1', location: 'Melbourne' },
@@ -89,7 +96,8 @@ describe('JobService', () => {
       ];
       mockJobRepository.findAll.mockResolvedValue(jobs);
 
-      const result = await jobService.searchJobs({ location: 'Melbourne' });
+      const { searchJobs } = createSearchJobsInteractor(mockJobRepository);
+      const result = await searchJobs({ location: 'Melbourne' });
 
       expect(result).toHaveLength(1);
       expect(result[0].location).toBe('Melbourne');
@@ -102,7 +110,8 @@ describe('JobService', () => {
       ];
       mockJobRepository.findAll.mockResolvedValue(jobs);
 
-      const result = await jobService.searchJobs({ title: 'engineer' });
+      const { searchJobs } = createSearchJobsInteractor(mockJobRepository);
+      const result = await searchJobs({ title: 'engineer' });
 
       expect(result).toHaveLength(1);
       expect(result[0].title).toContain('Engineer');
@@ -112,42 +121,54 @@ describe('JobService', () => {
       const jobs = [mockJob];
       mockJobRepository.findAll.mockResolvedValue(jobs);
 
-      const result = await jobService.searchJobs({});
+      const { searchJobs } = createSearchJobsInteractor(mockJobRepository);
+      const result = await searchJobs({});
 
       expect(result).toEqual(jobs);
     });
   });
 
-  describe('updateJob', () => {
+  describe('updateJobInteractor.updateJob', () => {
     it('should update a job when it exists', async () => {
       const updatedJob = { ...mockJob, title: 'Lead Engineer' };
       mockJobRepository.update.mockResolvedValue(updatedJob);
 
-      const result = await jobService.updateJob('job-1', { title: 'Lead Engineer' });
+      const { updateJob } = createUpdateJobInteractor(mockJobRepository);
+      const result = await updateJob('job-1', { title: 'Lead Engineer' });
 
       expect(result.title).toBe('Lead Engineer');
-      expect(mockJobRepository.update).toHaveBeenCalledWith('job-1', { title: 'Lead Engineer' });
+      expect(mockJobRepository.update).toHaveBeenCalledWith('job-1', {
+        title: 'Lead Engineer',
+      });
     });
 
     it('should throw when updating a non-existent job', async () => {
       mockJobRepository.update.mockResolvedValue(undefined);
 
-      await expect(jobService.updateJob('missing', { title: 'x' })).rejects.toThrow(HttpError);
+      const { updateJob } = createUpdateJobInteractor(mockJobRepository);
+
+      await expect(updateJob('missing', { title: 'x' })).rejects.toThrow(
+        HttpError,
+      );
     });
   });
 
-  describe('removeJob', () => {
+  describe('deleteJobInteractor.removeJob', () => {
     it('should remove a job when it exists', async () => {
       mockJobRepository.remove.mockResolvedValue(true);
 
-      await expect(jobService.removeJob('job-1')).resolves.toBeUndefined();
+      const { removeJob } = createDeleteJobInteractor(mockJobRepository);
+
+      await expect(removeJob('job-1')).resolves.toBeUndefined();
       expect(mockJobRepository.remove).toHaveBeenCalledWith('job-1');
     });
 
     it('should throw when removing a non-existent job', async () => {
       mockJobRepository.remove.mockResolvedValue(false);
 
-      await expect(jobService.removeJob('missing')).rejects.toThrow(HttpError);
+      const { removeJob } = createDeleteJobInteractor(mockJobRepository);
+
+      await expect(removeJob('missing')).rejects.toThrow(HttpError);
     });
   });
 });

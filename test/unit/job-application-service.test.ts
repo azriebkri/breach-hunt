@@ -1,9 +1,10 @@
-import { createJobApplicationService } from '../../src/application/services/job-application-service';
-import { JobApplicationRepository } from '../../src/domain/ports/job-application-repository';
-import { NotificationPort } from '../../src/domain/ports/notification-port';
-import { JobApplication } from '../../src/domain/models/job-application';
-import { ApplicationFailedError } from '../../src/domain/errors/application-failed';
-import { InMemoryJobRepository } from '../../src/infrastructure/repositories/in-memory-job-repository';
+import { createApplyToJobInteractor } from '../../src/usecases/applyToJob/applyToJobInteractor';
+import { createGetApplicationsForJobInteractor } from '../../src/usecases/getApplicationsForJob/getApplicationsForJobInteractor';
+import { JobApplicationRepository } from '../../src/entities/ports/jobApplicationRepository';
+import { NotificationPort } from '../../src/entities/ports/notificationPort';
+import { JobApplication } from '../../src/entities/jobApplication';
+import { ApplicationFailedError } from '../../src/entities/errors/applicationFailedError';
+import { InMemoryJobRepository } from '../../src/infrastructure/jobs/inMemoryJobRepository';
 
 const mockApplicationRepository: jest.Mocked<JobApplicationRepository> = {
   findByJobId: jest.fn(),
@@ -26,19 +27,12 @@ const mockJobRepository = {
   remove: jest.fn(),
 } as unknown as jest.Mocked<InMemoryJobRepository>;
 
-describe('JobApplicationService', () => {
-  let applicationService: ReturnType<typeof createJobApplicationService>;
-
+describe('JobApplication interactors', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    applicationService = createJobApplicationService(
-      mockApplicationRepository,
-      mockNotificationPort,
-      mockJobRepository,
-    );
   });
 
-  describe('applyToJob', () => {
+  describe('applyToJobInteractor.applyToJob', () => {
     it('should create an application when the job exists', async () => {
       const mockJob = {
         id: 'job-1',
@@ -52,9 +46,21 @@ describe('JobApplicationService', () => {
 
       mockJobRepository.findById.mockResolvedValue(mockJob);
       mockApplicationRepository.save.mockImplementation(async (app) => app);
-      mockNotificationPort.send.mockResolvedValue({ data: {}, status: 200, statusText: 'OK', headers: {}, config: {} } as never);
+      mockNotificationPort.send.mockResolvedValue({
+        data: {},
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {},
+      } as never);
 
-      const result = await applicationService.applyToJob('job-1', {
+      const { applyToJob } = createApplyToJobInteractor(
+        mockApplicationRepository,
+        mockNotificationPort,
+        mockJobRepository,
+      );
+
+      const result = await applyToJob('job-1', {
         applicantName: 'Jane Doe',
         applicantEmail: 'jane@example.com',
         coverLetter: 'I am excited to apply...',
@@ -73,8 +79,14 @@ describe('JobApplicationService', () => {
     it('should throw ApplicationFailedError when the job does not exist', async () => {
       mockJobRepository.findById.mockResolvedValue(undefined);
 
+      const { applyToJob } = createApplyToJobInteractor(
+        mockApplicationRepository,
+        mockNotificationPort,
+        mockJobRepository,
+      );
+
       await expect(
-        applicationService.applyToJob('missing-job', {
+        applyToJob('missing-job', {
           applicantName: 'Jane',
           applicantEmail: 'jane@example.com',
           coverLetter: 'Hello',
@@ -83,7 +95,7 @@ describe('JobApplicationService', () => {
     });
   });
 
-  describe('getApplicationsForJob', () => {
+  describe('getApplicationsForJobInteractor.getApplicationsForJob', () => {
     it('should return applications for a given job', async () => {
       const mockApplications: JobApplication[] = [
         {
@@ -96,12 +108,19 @@ describe('JobApplicationService', () => {
         },
       ];
 
-      mockApplicationRepository.findByJobId.mockResolvedValue(mockApplications);
+      mockApplicationRepository.findByJobId.mockResolvedValue(
+        mockApplications,
+      );
 
-      const result = await applicationService.getApplicationsForJob('job-1');
+      const { getApplicationsForJob } = createGetApplicationsForJobInteractor(
+        mockApplicationRepository,
+      );
+      const result = await getApplicationsForJob('job-1');
 
       expect(result).toEqual(mockApplications);
-      expect(mockApplicationRepository.findByJobId).toHaveBeenCalledWith('job-1');
+      expect(mockApplicationRepository.findByJobId).toHaveBeenCalledWith(
+        'job-1',
+      );
     });
   });
 });
