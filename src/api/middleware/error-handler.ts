@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { JobNotFoundError } from '../../domain/errors/job-not-found';
 import { ApplicationFailedError } from '../../domain/errors/application-failed';
 
 class HttpError extends Error {
@@ -15,11 +14,6 @@ class HttpError extends Error {
 const errorHandler = (err: Error, _req: Request, res: Response, _next: NextFunction): void => {
   if (err instanceof HttpError) {
     res.status(err.statusCode).json({ error: err.message });
-    return;
-  }
-
-  if (err instanceof JobNotFoundError) {
-    res.status(404).json({ error: err.message });
     return;
   }
 

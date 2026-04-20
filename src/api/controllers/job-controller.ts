@@ -34,6 +34,39 @@ const createJobController = (jobRepository: JobRepository) => {
     }
   };
 
+  const getJobsByCompany = async (
+    req: Request<{ company: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { company } = req.params;
+      const allJobs = await jobRepository.findAll();
+      const filtered = allJobs.filter((job) => job.company === company);
+      res.json(filtered);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  const getFeaturedJobs = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const featured = await jobRepository.findActiveHighPayingJobs();
+      res.json(featured);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  const searchJobs = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const results = await jobService.searchJobsFromRequest(req);
+      res.json(results);
+    } catch (error) {
+      next(error);
+    }
+  };
+
   const getJob = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
     try {
       const job = await jobService.getJobById(req.params.id);
@@ -65,6 +98,9 @@ const createJobController = (jobRepository: JobRepository) => {
   return {
     createJob,
     listJobs,
+    getJobsByCompany,
+    getFeaturedJobs,
+    searchJobs,
     getJob,
     updateJob,
     deleteJob,

@@ -19,6 +19,7 @@ const mockJobRepository: jest.Mocked<JobRepository> = {
   save: jest.fn(),
   update: jest.fn(),
   remove: jest.fn(),
+  findActiveHighPayingJobs: jest.fn(),
 };
 
 describe('JobService', () => {

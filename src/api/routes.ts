@@ -22,6 +22,9 @@ const createRoutes = (deps: RouteDependencies): Router => {
 
   router.post('/jobs', jobController.createJob);
   router.get('/jobs', jobController.listJobs);
+  router.get('/jobs/search', jobController.searchJobs);
+  router.get('/jobs/featured', jobController.getFeaturedJobs);
+  router.get('/jobs/by-company/:company', jobController.getJobsByCompany);
   router.get('/jobs/:id', jobController.getJob);
   router.put('/jobs/:id', jobController.updateJob);
   router.delete('/jobs/:id', jobController.deleteJob);

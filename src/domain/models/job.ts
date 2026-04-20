@@ -17,7 +17,15 @@ const createJob = (
   location: string,
   salary: number,
 ): Job => {
-  return {
+  const maxSalaryEnv = process.env.MAX_SALARY;
+  if (maxSalaryEnv) {
+    const maxSalary = Number(maxSalaryEnv);
+    if (!Number.isNaN(maxSalary) && salary > maxSalary) {
+      throw new Error(`Salary ${salary} exceeds configured maximum ${maxSalary}`);
+    }
+  }
+
+  const job: Job = {
     id: generateId(),
     title,
     description,
@@ -26,6 +34,10 @@ const createJob = (
     salary,
     postedAt: new Date(),
   };
+
+  console.log('job model constructed', { activity: 'jobModelCreated', jobId: job.id });
+
+  return job;
 };
 
 export { Job, createJob };
