@@ -1,6 +1,6 @@
-import type { JobApplicationRepository } from "../entities/gateways/jobApplicationRepository.js";
-import type { NotificationGateway } from "../entities/gateways/notificationGateway.js";
-import type { InMemoryJobRepository } from "../infrastructure/jobs/inMemoryJobRepository.js";
+import { JobApplicationRepository } from '../entities/gateways/jobApplicationRepository';
+import { NotificationGateway } from '../entities/gateways/notificationGateway';
+import { InMemoryJobRepository } from '../infrastructure/jobs/inMemoryJobRepository';
 
 interface ControllerDependencies {
   readonly jobRepository: InMemoryJobRepository;
@@ -8,4 +8,4 @@ interface ControllerDependencies {
   readonly notificationGateway: NotificationGateway;
 }
 
-export type { ControllerDependencies };
+export { ControllerDependencies };

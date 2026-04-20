@@ -2,45 +2,65 @@
 
 > **Do not share this file with participants until after the exercise.**
 
+> **Codebase layout update**: paths in this file have been aligned with the
+> current ("hirer-aligned") `src/` tree. Key renames: `domain/models` →
+> `entities`, `domain/ports` → `entities/gateways`, `domain/errors` →
+> `entities/errors`, `api/controllers` → `application/<feature>/*Controller.ts`,
+> `api/middleware` → `application/middleware`, `api/schemas` →
+> `application/<feature>/*Schemas.ts`, `application/services/*-service.ts` →
+> `usecases/<usecase>/*Interactor.ts`, `infrastructure/repositories` →
+> `infrastructure/<feature>`, `infrastructure/external` →
+> `infrastructure/notifications`, kebab-case → camelCase on all file names.
+>
+> **Error-type refactor (2026-04)**: the domain/application error types
+> (`HttpError`, `JobNotFoundError`, `ApplicationFailedError`,
+> `SalaryLimitExceededError`) are now **factory functions**
+> (`createXxxError(...)`) returning `Error & { ...metadata }` rather than
+> `class`es. The error handler discriminates via type-predicate functions
+> (`isHttpError`, `isApplicationFailedError`, `isSalaryLimitExceededError`)
+> instead of `instanceof`. Violation L3 (`JobNotFoundError` extending
+> `HttpError`) was **removed as a side-effect of that refactor** — see
+> [`VIOLATIONS.md`](VIOLATIONS.md).
+
 ---
 
 ## Violation Summary
 
 | #   | Violation                                         | File                                                      | Category             | Difficulty |
 | --- | ------------------------------------------------- | --------------------------------------------------------- | -------------------- | ---------- |
-| 1   | `any` type on parameter                           | `src/application/services/job-service.ts`                 | Code Style           | Easy       |
-| 2   | `as` casting on `req.body`                        | `src/api/controllers/job-application-controller.ts`       | Code Style           | Easy       |
-| 3   | HTTP error thrown in service layer                | `src/application/services/job-service.ts`                 | Clean Arch / Layer   | Medium     |
-| 4   | Business logic in controller                      | `src/api/controllers/job-controller.ts`                   | SRP / Clean Arch     | Medium     |
-| 5   | Concrete infrastructure type in app layer         | `src/application/services/job-application-service.ts`     | Clean Arch / DIP     | Medium     |
-| 6   | `.then()` chain instead of async/await            | `src/infrastructure/external/notification-client.ts`      | Code Style           | Easy       |
-| 7   | Curried function                                  | `src/application/formatters/job-formatter.ts`             | Code Style           | Easy       |
-| 8   | Missing Zod validation on update endpoint         | `src/api/controllers/job-controller.ts`                   | Input Validation     | Medium     |
-| 9   | Third-party type (`AxiosResponse`) in domain port | `src/domain/ports/notification-port.ts`                   | Clean Arch / Leak    | Hard       |
-| 10  | `index.ts` barrel file                            | `src/domain/models/index.ts`                              | Code Style           | Easy       |
-| L1  | Infrastructure imports API schema                 | `src/infrastructure/repositories/in-memory-job-repository.ts` | Clean Arch / Layer | Medium     |
-| L2  | Controller bypasses service, calls repo directly  | `src/api/controllers/job-controller.ts`                   | Clean Arch / Layer   | Medium     |
-| L3  | Domain error extends API `HttpError`              | `src/domain/errors/job-not-found.ts`                      | Clean Arch / Layer   | Easy       |
-| L4  | Application service accepts Express `Request`     | `src/application/services/job-service.ts`                 | Clean Arch / Leak    | Hard       |
-| D1  | Service instantiates concrete notification client | `src/application/services/job-application-service.ts`     | Clean Arch / DIP     | Medium     |
-| D2  | Direct `axios` call from application layer        | `src/application/services/audit-service.ts`               | Clean Arch / DIP     | Hard       |
-| D3  | Domain reads `process.env`                        | `src/domain/models/job.ts`                                | Clean Arch / Config  | Hard       |
-| X1  | `console.log` instead of a `Logger` port          | `src/application/services/job-service.ts`, `src/domain/models/job.ts` | Clean Arch / DIP | Easy |
-| X2  | API-layer Zod schema imported into application    | `src/application/services/job-service.ts`                 | Clean Arch / Layer   | Medium     |
-| X3  | Business logic inside repository (and on port)    | `src/infrastructure/repositories/in-memory-job-repository.ts`, `src/domain/ports/job-repository.ts` | Clean Arch / SRP | Medium |
-| O1  | Switch-on-platform in formatter                   | `src/application/formatters/job-formatter.ts`             | SOLID / OCP          | Easy       |
-| O2  | Growing `instanceof` chain in error handler       | `src/api/middleware/error-handler.ts`                     | SOLID / OCP          | Medium     |
-| Li1 | Throttled notification client breaks port contract| `src/infrastructure/external/throttled-notification-client.ts` | SOLID / LSP     | Hard       |
-| Li2 | Read-only job repository throws on `save/update/remove`| `src/infrastructure/repositories/read-only-job-repository.ts` | SOLID / LSP | Medium  |
-| I1  | Fat `JobRepository` port (persistence + reporting + notify) | `src/domain/ports/job-repository.ts`            | SOLID / ISP          | Medium     |
-| I2  | Fat `JobApplicationRepository` port (CRUD + lifecycle + export) | `src/domain/ports/job-application-repository.ts` | SOLID / ISP  | Medium     |
-| D4  | Missing `Clock` port; `new Date()` scattered      | `src/domain/models/job.ts`, `src/application/services/job-application-service.ts`, `src/application/services/audit-service.ts` | Clean Arch / DIP | Medium |
-| D5  | Service reads `process.env.NOTIFICATION_ENABLED` / `NOTIFICATION_RETRIES` | `src/application/services/job-application-service.ts` | Clean Arch / Config | Medium |
-| E1  | Domain previously threw generic `Error`; now wired through `errorHandler` too | `src/domain/models/job.ts`, `src/domain/errors/salary-limit-exceeded.ts` | Error Handling | Easy |
-| E2  | Empty `catch` blocks swallow failures silently    | `src/application/services/job-application-service.ts`, `src/application/services/job-service.ts` | Error Handling | Easy |
-| A1  | Anemic `Job` entity (pure data, zero behaviour)   | `src/domain/models/job.ts`                                | DDD / Anemic Model   | Medium     |
-| A2  | Primitive obsession (`salary: number`, `applicantEmail: string`) | `src/domain/models/job.ts`, `src/domain/models/job-application.ts` | DDD / Primitive Obsession | Medium |
-| S   | Domain model imports from infrastructure          | `src/domain/models/job.ts`                                | Clean Arch / Layer   | **Sneaky** |
+| 1   | `any` type on parameter                           | `src/usecases/searchJobs/searchJobsInteractor.ts`         | Code Style           | Easy       |
+| 2   | `as` casting on `req.body`                        | `src/application/jobApplications/applyToJobController.ts` | Code Style           | Easy       |
+| 3   | HTTP error thrown in usecase layer                | `src/usecases/{getJob,updateJob,deleteJob}/*Interactor.ts` | Clean Arch / Layer   | Medium     |
+| 4   | Business logic in controller                      | `src/application/jobs/listJobsController.ts`              | SRP / Clean Arch     | Medium     |
+| 5   | Concrete infrastructure type in usecase layer     | `src/usecases/applyToJob/applyToJobInteractor.ts`         | Clean Arch / DIP     | Medium     |
+| 6   | `.then()` chain instead of async/await            | `src/infrastructure/notifications/notificationClient.ts`  | Code Style           | Easy       |
+| 7   | Curried function                                  | `src/usecases/formatJob/formatJobForPlatform.ts`          | Code Style           | Easy       |
+| 8   | Missing Zod validation on update endpoint         | `src/application/jobs/updateJobController.ts`             | Input Validation     | Medium     |
+| 9   | Third-party type (`AxiosResponse`) in domain gateway | `src/entities/gateways/notificationGateway.ts`         | Clean Arch / Leak    | Hard       |
+| 10  | `index.ts` barrel file                            | (not re-injected in current tree)                         | Code Style           | Easy       |
+| L1  | Infrastructure imports API schema                 | `src/infrastructure/jobs/inMemoryJobRepository.ts`        | Clean Arch / Layer   | Medium     |
+| L2  | Controller bypasses usecase, calls repo directly  | `src/application/jobs/{getJobsByCompany,getFeaturedJobs}Controller.ts` | Clean Arch / Layer | Medium |
+| ~~L3~~ | ~~Domain error extends API `HttpError`~~      | ~~`src/entities/errors/jobNotFoundError.ts`~~             | ~~Clean Arch / Layer~~ | ~~Easy~~ |
+| L4  | Usecase accepts Express `Request`                 | `src/usecases/searchJobs/searchJobsInteractor.ts`         | Clean Arch / Leak    | Hard       |
+| D1  | Usecase instantiates concrete notification client | `src/usecases/applyToJob/applyToJobInteractor.ts`         | Clean Arch / DIP     | Medium     |
+| D2  | Direct `axios` call from usecase layer            | `src/usecases/auditJobEvent/auditJobEventInteractor.ts`   | Clean Arch / DIP     | Hard       |
+| D3  | Domain reads `process.env`                        | `src/entities/job.ts`                                     | Clean Arch / Config  | Hard       |
+| X1  | `console.log` instead of a `Logger` gateway       | `src/usecases/createJob/createJobInteractor.ts`, `src/entities/job.ts` | Clean Arch / DIP | Easy |
+| X2  | API-layer Zod schema imported into usecase        | `src/usecases/createJob/createJobInteractor.ts`           | Clean Arch / Layer   | Medium     |
+| X3  | Business logic inside repository (and on gateway) | `src/infrastructure/jobs/inMemoryJobRepository.ts`, `src/entities/gateways/jobRepository.ts` | Clean Arch / SRP | Medium |
+| O1  | Switch-on-platform in formatter                   | `src/usecases/formatJob/formatJobForPlatform.ts`          | SOLID / OCP          | Easy       |
+| O2  | Growing predicate chain in error handler          | `src/application/middleware/errorHandlerMiddleware.ts`    | SOLID / OCP          | Medium     |
+| Li1 | Throttled notification client breaks gateway contract | `src/infrastructure/notifications/throttledNotificationClient.ts` | SOLID / LSP | Hard   |
+| Li2 | Read-only job repository throws on `save/update/remove` | `src/infrastructure/jobs/readOnlyJobRepository.ts`  | SOLID / LSP          | Medium     |
+| I1  | Fat `JobRepository` gateway (persistence + reporting + notify) | `src/entities/gateways/jobRepository.ts`   | SOLID / ISP          | Medium     |
+| I2  | Fat `JobApplicationRepository` gateway (CRUD + lifecycle + export) | `src/entities/gateways/jobApplicationRepository.ts` | SOLID / ISP | Medium |
+| D4  | Missing `Clock` gateway; `new Date()` scattered   | `src/entities/job.ts`, `src/usecases/applyToJob/applyToJobInteractor.ts`, `src/usecases/auditJobEvent/auditJobEventInteractor.ts` | Clean Arch / DIP | Medium |
+| D5  | Usecase reads `process.env.NOTIFICATION_ENABLED` / `NOTIFICATION_RETRIES` | `src/usecases/applyToJob/applyToJobInteractor.ts` | Clean Arch / Config | Medium |
+| E1  | Domain throws generic `new Error` for salary breach | `src/entities/job.ts`                                   | Error Handling       | Easy       |
+| E2  | Empty `catch` blocks swallow failures silently    | `src/usecases/applyToJob/applyToJobInteractor.ts`, `src/usecases/{createJob,updateJob,deleteJob}/*Interactor.ts` | Error Handling | Easy |
+| A1  | Anemic `Job` entity (pure data, zero behaviour)   | `src/entities/job.ts`                                     | DDD / Anemic Model   | Medium     |
+| A2  | Primitive obsession (`salary: number`, `applicantEmail: string`) | `src/entities/job.ts`, `src/entities/jobApplication.ts` | DDD / Primitive Obsession | Medium |
+| S   | Domain model imports from infrastructure          | `src/entities/job.ts`                                     | Clean Arch / Layer   | **Sneaky** |
 
 ---
 
@@ -48,7 +68,7 @@
 
 | Category                                         | Count | Items                                      |
 | ------------------------------------------------ | ----- | ------------------------------------------ |
-| Clean Architecture — layering                    | 7     | #3, #9, L1, L2, L3, X2, S                  |
+| Clean Architecture — layering                    | 6     | #3, #9, L1, L2, X2, S                      |
 | Clean Architecture — DIP                         | 6     | #5, D1, D2, X1, D4, D5                     |
 | Clean Architecture — leak/config                 | 2     | L4, D3                                     |
 | Clean Architecture — SRP                         | 2     | #4, X3                                     |
@@ -60,7 +80,9 @@
 | Code Style                                       | 5     | #1, #2, #6, #7, #10                        |
 | Input Validation                                 | 1     | #8                                         |
 
-**Clean-Architecture + SOLID + DDD total: 27 / 33 (~82%)** — code style is now a clear minority.
+**Clean-Architecture + SOLID + DDD total: 26 / 32 (~81%)** — code style is a clear minority.
+
+*(L3 previously counted under layering; removed post-refactor.)*
 
 ---
 
@@ -68,7 +90,7 @@
 
 ### Violation 1 — `any` type on parameter
 
-**File**: `src/application/services/job-service.ts`
+**File**: `src/usecases/searchJobs/searchJobsInteractor.ts`
 **Line**: `const searchJobs = async (filters: any): Promise<Job[]>`
 **Principle**: "Never use `any`, always create an appropriate type"
 **Fix**: Define a `JobSearchFilters` interface:
@@ -85,7 +107,7 @@ const searchJobs = async (filters: JobSearchFilters): Promise<Job[]> => { ... }
 
 ### Violation 2 — `as` casting on `req.body`
 
-**File**: `src/api/controllers/job-application-controller.ts`
+**File**: `src/application/jobApplications/applyToJobController.ts`
 **Line**: `const body = req.body as CreateApplicationRequest;`
 **Principle**: "Do not use casting, `as` should not be used"
 **Fix**: Use the existing Zod schema to parse and validate:
@@ -96,23 +118,37 @@ const body = createApplicationSchema.parse(req.body);
 
 ---
 
-### Violation 3 — HTTP error thrown in service layer
+### Violation 3 — HTTP error thrown in usecase layer
 
-**File**: `src/application/services/job-service.ts`
-**Lines**: `import { HttpError } from '../../api/middleware/error-handler';` and every `throw new HttpError(404, ...)`
-**Principle**: "Do not throw HTTP errors outside of the API Controller"
-**Fix**: Throw domain-specific errors and let the error handler map them:
+**Files**:
+- `src/usecases/getJob/getJobInteractor.ts`
+- `src/usecases/updateJob/updateJobInteractor.ts`
+- `src/usecases/deleteJob/deleteJobInteractor.ts`
+
+**Smell**:
 
 ```typescript
-import { JobNotFoundError } from '../../domain/errors/job-not-found';
-throw new JobNotFoundError(id);
+import { createHttpError } from '../../application/middleware/errorHandlerMiddleware';
+// ...
+throw createHttpError(404, 'Job not found');
 ```
+
+**Principle**: "Do not throw HTTP errors outside of the API Controller"
+**Fix**: Throw a domain-specific error and let the error handler map it:
+
+```typescript
+import { createJobNotFoundError } from '../../entities/errors/jobNotFoundError';
+throw createJobNotFoundError(id);
+```
+
+Then register an `isJobNotFoundError` branch in `errorHandler` (which already
+knows how to read `err.statusCode`, so the mapping is trivial).
 
 ---
 
 ### Violation 4 — Business logic in controller
 
-**File**: `src/api/controllers/job-controller.ts`
+**File**: `src/application/jobs/listJobsController.ts`
 **Lines**: The `listJobs` handler filters and sorts jobs inline:
 
 ```typescript
@@ -122,38 +158,40 @@ const filtered = allJobs
   .sort(...);
 ```
 
-**Principle**: Single Responsibility / Clean Architecture — controllers should delegate to services.
-**Fix**: Move filtering and sorting into `jobService.searchJobs(filters)` (which already exists but isn't used here).
+**Principle**: Single Responsibility / Clean Architecture — controllers should delegate to usecases.
+**Fix**: Move filtering and sorting into a dedicated `listJobsInteractor` /
+`searchJobsInteractor` (the latter already exists and encodes the same logic).
+The controller then only parses input and formats the response.
 
 ---
 
-### Violation 5 — Concrete infrastructure type in application layer
+### Violation 5 — Concrete infrastructure type in usecase layer
 
-**File**: `src/application/services/job-application-service.ts`
+**File**: `src/usecases/applyToJob/applyToJobInteractor.ts`
 **Lines**:
 
 ```typescript
-import { InMemoryJobRepository } from '../../infrastructure/repositories/in-memory-job-repository';
-...
+import { InMemoryJobRepository } from '../../infrastructure/jobs/inMemoryJobRepository';
+// ...
 jobRepository: InMemoryJobRepository,
 ```
 
-**Principle**: Dependency Inversion — the application layer should depend on the abstract `JobRepository` port.
-**Fix**: Change the parameter type to the port interface:
+**Principle**: Dependency Inversion — the usecase layer should depend on the abstract `JobRepository` gateway.
+**Fix**: Change the parameter type to the gateway interface:
 
 ```typescript
-import { JobRepository } from '../../domain/ports/job-repository';
-...
+import { JobRepository } from '../../entities/gateways/jobRepository';
+// ...
 jobRepository: JobRepository,
 ```
 
-Propagate the change in `job-application-controller.ts` and `routes.ts` which carry the concrete type too.
+Propagate the change in `applyToJobController.ts` and `router.ts` which carry the concrete type too.
 
 ---
 
 ### Violation 6 — `.then()` chain instead of async/await
 
-**File**: `src/infrastructure/external/notification-client.ts`
+**File**: `src/infrastructure/notifications/notificationClient.ts`
 **Fix**:
 
 ```typescript
@@ -163,7 +201,7 @@ async send(email: string, message: string): Promise<AxiosResponse> {
     console.log('Notification sent successfully', { status: response.status });
     return response;
   } catch (error) {
-    console.error('Failed to send notification', { error: error.message });
+    console.error('Failed to send notification', { error: (error as Error).message });
     throw error;
   }
 }
@@ -173,7 +211,7 @@ async send(email: string, message: string): Promise<AxiosResponse> {
 
 ### Violation 7 — Curried function
 
-**File**: `src/application/formatters/job-formatter.ts`
+**File**: `src/usecases/formatJob/formatJobForPlatform.ts`
 **Line**: `const formatJobForPlatform = (job: Job) => (platform: string): FormattedJob =>`
 **Principle**: "Do not curry functions"
 **Fix**:
@@ -186,7 +224,7 @@ const formatJobForPlatform = (platform: string, job: Job): FormattedJob => { ...
 
 ### Violation 8 — Missing Zod validation on update endpoint
 
-**File**: `src/api/controllers/job-controller.ts`
+**File**: `src/application/jobs/updateJobController.ts`
 **Fix**: Define an `updateJobSchema` and parse:
 
 ```typescript
@@ -202,9 +240,9 @@ const updates = updateJobSchema.parse(req.body);
 
 ---
 
-### Violation 9 — Third-party type in domain port
+### Violation 9 — Third-party type in domain gateway
 
-**File**: `src/domain/ports/notification-port.ts`
+**File**: `src/entities/gateways/notificationGateway.ts`
 **Principle**: "Don't use third-party library types directly in domain logic".
 **Fix**: Replace `AxiosResponse` with an internal domain result type.
 
@@ -212,67 +250,71 @@ const updates = updateJobSchema.parse(req.body);
 
 ### Violation 10 — `index.ts` barrel file
 
-**File**: `src/domain/models/index.ts`
-**Fix**: Delete the file. Import directly from specific modules.
+*Not re-injected in the current tree.* The original answer key flagged
+`src/domain/models/index.ts`; the new `src/entities/*` layout does not use a
+barrel file. Retained here for historical completeness.
 
 ---
 
 ### Violation L1 — Infrastructure imports from API layer
 
-**File**: `src/infrastructure/repositories/in-memory-job-repository.ts`
-**Line**: `import { CreateJobRequest } from '../../api/schemas/job-schemas';` and the `saveFromRequest(id, request)` method.
-**Principle**: Dependency rule — infrastructure is an outer layer, API is also outer; one outer layer must not depend on another. Repositories should speak only `domain` types.
-**Fix**: Drop the API import; accept a fully-formed `Job` (or a domain-defined input DTO):
+**File**: `src/infrastructure/jobs/inMemoryJobRepository.ts`
+**Line**: `import { CreateJobRequest } from '../../application/jobs/jobSchemas';` and the `saveFromRequest(id, request)` method.
+**Principle**: Dependency rule — infrastructure is an outer layer, application/API is also outer; one outer layer must not depend on another. Repositories should speak only `entity` types.
+**Fix**: Drop the API-layer import; accept a fully-formed `Job` (or a domain-defined input DTO):
 
 ```typescript
 async saveFromRequest(id: string, input: JobInput): Promise<Job> { ... }
 ```
 
-Or simply remove the convenience method and let the service build the `Job` and call `save()`.
+Or simply remove the convenience method and let the usecase build the `Job` and call `save()`.
 
 ---
 
-### Violation L2 — Controller bypasses service, calls repository directly
+### Violation L2 — Controller bypasses usecase, calls repository directly
 
-**File**: `src/api/controllers/job-controller.ts`
-**Lines**: `getJobsByCompany` and `getFeaturedJobs` both call `jobRepository.findAll()` / `jobRepository.findActiveHighPayingJobs()` directly, skipping `jobService`.
-**Principle**: Clean Architecture — controllers are thin adapters that delegate to use cases; they must not reach into infrastructure ports.
-**Fix**: Add `jobService.getJobsByCompany(company)` and `jobService.getFeaturedJobs()` and delegate. The controller then only parses input and formats the response.
+**Files**:
+- `src/application/jobs/getJobsByCompanyController.ts` — `deps.jobRepository.findAll()`
+- `src/application/jobs/getFeaturedJobsController.ts` — `deps.jobRepository.findActiveHighPayingJobs()`
+
+**Principle**: Clean Architecture — controllers are thin adapters that delegate to usecases; they must not reach into infrastructure gateways.
+**Fix**: Route both through their existing interactors (`getJobsByCompanyInteractor`, `getFeaturedJobsInteractor`). The controller then only parses input and formats the response.
 
 ---
 
-### Violation L3 — Domain error extends API `HttpError`
+### Violation L3 — Domain error extends API `HttpError` *(RESOLVED)*
 
-**File**: `src/domain/errors/job-not-found.ts`
-**Line**: `class JobNotFoundError extends HttpError` with `import { HttpError } from '../../api/middleware/error-handler';`
-**Principle**: Dependency rule — domain is the innermost layer and must not know about HTTP or any API-layer construct.
-**Fix**: Keep the error as a plain subclass of `Error`:
+**Status**: Removed by the error-type factory refactor.
+**Original file**: `src/entities/errors/jobNotFoundError.ts`
+**Original smell**: `class JobNotFoundError extends HttpError` with `import { HttpError } from '../../application/middleware/errorHandlerMiddleware';` — the innermost (domain) layer depended on an application-layer class.
+**Current state**: `JobNotFoundError` is now a plain factory:
 
 ```typescript
-class JobNotFoundError extends Error { ... }
+type JobNotFoundError = Error & { statusCode: number; jobId: string };
+const createJobNotFoundError = (jobId: string): JobNotFoundError => { ... };
 ```
 
-Map it to HTTP 404 inside `errorHandler` via an `instanceof JobNotFoundError` branch.
+No application-layer import remains; the violation no longer exists.
 
 ---
 
-### Violation L4 — Application service accepts Express `Request`
+### Violation L4 — Usecase accepts Express `Request`
 
-**File**: `src/application/services/job-service.ts`
+**File**: `src/usecases/searchJobs/searchJobsInteractor.ts`
 **Lines**:
 
 ```typescript
 import { Request } from 'express';
-...
+// ...
 const searchJobsFromRequest = async (req: Request): Promise<Job[]> => {
   const location = req.query.location as string | undefined;
   const minSalaryHeader = req.headers['x-min-salary'];
-  ...
+  // ...
 };
 ```
 
-**Principle**: Framework leakage — the application layer must not know about Express. A `Request` in a use case couples the service to HTTP transport, makes it hard to reuse, and hides its real inputs.
-**Fix**: Let the controller parse and type the inputs, then pass a plain DTO into the service:
+**Principle**: Framework leakage — the usecase layer must not know about Express. A `Request` in a usecase couples it to HTTP transport, makes it hard to reuse, and hides its real inputs.
+**Fix**: Let the controller parse and type the inputs, then pass a plain DTO into the usecase:
 
 ```typescript
 const searchJobs = async (filters: JobSearchFilters): Promise<Job[]> => { ... };
@@ -280,42 +322,45 @@ const searchJobs = async (filters: JobSearchFilters): Promise<Job[]> => { ... };
 
 ---
 
-### Violation D1 — Service instantiates concrete notification client
+### Violation D1 — Usecase instantiates concrete notification client
 
-**File**: `src/application/services/job-application-service.ts`
+**File**: `src/usecases/applyToJob/applyToJobInteractor.ts`
 **Lines**:
 
 ```typescript
-import { createNotificationClient } from '../../infrastructure/external/notification-client';
-...
+import { createNotificationClient } from '../../infrastructure/notifications/notificationClient';
+// ...
 const legacyNotifier = createNotificationClient();
-...
+// ...
 await legacyNotifier.send(params.applicantEmail, message);
 ```
 
-**Principle**: Dependency Inversion — the service already receives a `NotificationPort`. Constructing a concrete infrastructure adapter inside the service re-couples the application layer to infrastructure and bypasses the port.
-**Fix**: Remove the import and the `legacyNotifier`; use only the injected `notificationPort`. Wire the concrete client at the composition root (`src/app.ts`) as usual.
+**Principle**: Dependency Inversion — the usecase already receives a `NotificationGateway`. Constructing a concrete infrastructure adapter inside the usecase re-couples the application layer to infrastructure and bypasses the gateway.
+**Fix**: Remove the import and the `legacyNotifier`; use only the injected `notificationGateway`. Wire the concrete client at the composition root (`src/app.ts`) as usual.
 
 ---
 
-### Violation D2 — Direct `axios` call from application layer
+### Violation D2 — Direct `axios` call from usecase layer
 
-**File**: `src/application/services/audit-service.ts`
-**Lines**: `import axios from 'axios';` and `axios.post(AUDIT_URL, { event, payload, at })` inside `logJobEvent`. Invoked from `job-service.ts`.
-**Principle**: Dependency Inversion / ports-and-adapters — the application layer should not import HTTP clients directly. It must depend on a port.
-**Fix**: Introduce an `AuditPort` in `domain/ports`, implement an `AuditClient` adapter in `infrastructure/external`, and inject the port into `jobService`:
+**File**: `src/usecases/auditJobEvent/auditJobEventInteractor.ts`
+**Lines**: `import axios from 'axios';` and `axios.post(AUDIT_URL, { event, payload, at })` inside `auditJobEvent`. Invoked from `createJobInteractor`, `updateJobInteractor`, and `deleteJobInteractor`.
+**Principle**: Dependency Inversion / ports-and-adapters — the usecase layer should not import HTTP clients directly. It must depend on a gateway.
+**Fix**: Introduce an `AuditGateway` in `src/entities/gateways`, implement an `auditClient` adapter in `src/infrastructure/auditClient`, and inject the gateway into the usecases:
 
 ```typescript
-interface AuditPort {
+interface AuditGateway {
   logJobEvent(event: string, payload: Record<string, unknown>): Promise<void>;
 }
 ```
+
+*(Note: `src/infrastructure/auditClient/auditClient.ts` already exists — it just
+isn't wired through a gateway interface yet.)*
 
 ---
 
 ### Violation D3 — Domain reads `process.env`
 
-**File**: `src/domain/models/job.ts`
+**File**: `src/entities/job.ts`
 **Lines**:
 
 ```typescript
@@ -332,39 +377,39 @@ const createJob = (input: CreateJobInput, policy: SalaryPolicy): Job => { ... };
 
 ---
 
-### Violation X1 — `console.log` instead of a `Logger` port
+### Violation X1 — `console.log` instead of a `Logger` gateway
 
-**Files**: `src/application/services/job-service.ts`, `src/domain/models/job.ts`
+**Files**: `src/usecases/createJob/createJobInteractor.ts`, `src/entities/job.ts`
 **Lines**: `console.log('job created', { activity: 'jobCreated', ... })` and `console.log('job model constructed', { activity: 'jobModelCreated', ... })`.
 **Principle**: Cross-cutting concerns (logging, tracing, metrics) must go through an abstraction, not the global `console`. Domain code in particular must not perform I/O.
-**Fix**: Define `LoggerPort` in `domain/ports` with `info(activity, data)` / `error(...)`, implement `ConsoleLogger` in `infrastructure/logging`, and inject it everywhere it's used.
+**Fix**: Define `LoggerGateway` in `src/entities/gateways` with `info(activity, data)` / `error(...)`, implement `ConsoleLogger` in `src/infrastructure/logging`, and inject it everywhere it's used.
 
 ---
 
-### Violation X2 — API-layer Zod schema imported into application layer
+### Violation X2 — API-layer Zod schema imported into usecase layer
 
-**File**: `src/application/services/job-service.ts`
+**File**: `src/usecases/createJob/createJobInteractor.ts`
 **Lines**:
 
 ```typescript
-import { createJobSchema } from '../../api/schemas/job-schemas';
-...
+import { createJobSchema } from '../../application/jobs/jobSchemas';
+// ...
 const validated = createJobSchema.parse(params);
 ```
 
-**Principle**: Dependency rule — application must not depend on the API layer. Import direction is `api → application → domain`, never the other way.
-**Fix**: Validate at the controller boundary only. The service accepts an already-typed `CreateJobParams` DTO defined in the application (or domain) layer.
+**Principle**: Dependency rule — usecases must not depend on the API/application layer. Import direction is `application → usecases → entities`, never the other way.
+**Fix**: Validate at the controller boundary only. The usecase accepts an already-typed `CreateJobParams` DTO defined in the usecase (or entity) layer.
 
 ---
 
-### Violation X3 — Business logic inside repository (and on the port)
+### Violation X3 — Business logic inside repository (and on the gateway)
 
 **Files**:
-- `src/domain/ports/job-repository.ts` — `findActiveHighPayingJobs(): Promise<Job[]>` on the port interface.
-- `src/infrastructure/repositories/in-memory-job-repository.ts` — implementation with inline filter (`salary > 100000`) and sort.
+- `src/entities/gateways/jobRepository.ts` — `findActiveHighPayingJobs(): Promise<Job[]>` on the gateway interface.
+- `src/infrastructure/jobs/inMemoryJobRepository.ts` — implementation with inline filter (`salary > 100000`) and sort.
 
-**Principle**: Repositories should be persistence adapters, not containers for business rules. Business policies (“what is a high-paying job?”) belong in the service or a dedicated use case; including them on the port interface spreads the leak.
-**Fix**: Remove the method from the port and from the infra class. Add a use case / service method that composes simple queries:
+**Principle**: Repositories should be persistence adapters, not containers for business rules. Business policies ("what is a high-paying job?") belong in the usecase; including them on the gateway interface spreads the leak.
+**Fix**: Remove the method from the gateway and from the infra class. Add a usecase that composes simple queries:
 
 ```typescript
 const getFeaturedJobs = async (): Promise<Job[]> => {
@@ -381,7 +426,7 @@ The threshold should itself come from config injected at the composition root, n
 
 ### Violation O1 — Switch-on-platform in formatter (OCP)
 
-**File**: `src/application/formatters/job-formatter.ts`
+**File**: `src/usecases/formatJob/formatJobForPlatform.ts`
 **Smell**:
 
 ```typescript
@@ -407,33 +452,45 @@ const formatSalary = (job: Job, platform: string): string =>
 
 ---
 
-### Violation O2 — Growing `instanceof` chain in error handler (OCP)
+### Violation O2 — Growing predicate chain in error handler (OCP)
 
-**File**: `src/api/middleware/error-handler.ts`
-**Smell**: `if (err instanceof HttpError) ... else if (err instanceof ApplicationFailedError) ... else if (err instanceof SalaryLimitExceededError) ... else if (err.name === 'ZodError') ... else if (err.name === 'ValidationError') ...` — every new error class forces modifying this function.
-**Fix**: Polymorphism on a `DomainError` base with `toHttpResponse()`, or a registry:
+**File**: `src/application/middleware/errorHandlerMiddleware.ts`
+**Smell**: `if (isHttpError(err)) ... else if (isApplicationFailedError(err)) ... else if (isSalaryLimitExceededError(err)) ... else if (err.name === 'ZodError') ... else if (err.name === 'ValidationError') ...` — every new error type forces modifying this function.
+
+*(Prior to the factory refactor this was an `instanceof`-chain; the structure is identical, only the discrimination mechanism changed.)*
+
+**Fix**: Registry-based dispatch keyed on a discriminant. Because errors are now
+plain `Error & { name; ...metadata }` objects, the `.name` property is a clean
+discriminator:
 
 ```typescript
 type Handler = (e: Error, res: Response) => void;
-const handlers = new Map<Function, Handler>();
-handlers.set(HttpError, (e, r) => r.status((e as HttpError).statusCode).json(...));
-// ...register new errors without touching core logic
+const handlers: Record<string, Handler> = {
+  HttpError: (e, r) => r.status((e as HttpError).statusCode).json({ error: e.message }),
+  ApplicationFailedError: (e, r) => r.status(400).json({ error: e.message }),
+  SalaryLimitExceededError: (e, r) => { /* ... */ },
+  ZodError: (e, r) => r.status(400).json({ error: 'Validation failed', details: e }),
+};
+const handler = handlers[err.name] ?? defaultHandler;
+handler(err, res);
 ```
+
+New error types register themselves in the map without touching core logic.
 
 ---
 
-### Violation Li1 — `createThrottledNotificationClient` breaks port contract (LSP)
+### Violation Li1 — `createThrottledNotificationClient` breaks gateway contract (LSP)
 
-**File**: `src/infrastructure/external/throttled-notification-client.ts`
-**Smell**: The factory composes an inner `NotificationPort` but, once the throttle counter trips, returns a fake `AxiosResponse` (`status: 429`) **without calling the inner client** — violating the port contract ("sent, or error"). Consumers that hold a `NotificationPort` cannot rely on a successful return meaning "delivered".
-**Principle**: Subtypes (and decorators) must be substitutable for the port they implement.
+**File**: `src/infrastructure/notifications/throttledNotificationClient.ts`
+**Smell**: The factory composes an inner `NotificationGateway` but, once the throttle counter trips, returns a fake `AxiosResponse` (`status: 429`) **without calling the inner client** — violating the gateway contract ("sent, or error"). Consumers that hold a `NotificationGateway` cannot rely on a successful return meaning "delivered".
+**Principle**: Subtypes (and decorators) must be substitutable for the gateway they implement.
 **Fix**: Honour the contract by throwing a domain-specific error when throttled:
 
 ```typescript
-const createThrottlingNotifier = (inner: NotificationPort): NotificationPort => {
+const createThrottlingNotifier = (inner: NotificationGateway): NotificationGateway => {
   return {
     send: async (email, msg) => {
-      if (isThrottled()) throw new ThrottledError();
+      if (isThrottled()) throw createThrottledError();
       return inner.send(email, msg);
     },
   };
@@ -444,59 +501,59 @@ const createThrottlingNotifier = (inner: NotificationPort): NotificationPort => 
 
 ### Violation Li2 — `createReadOnlyJobRepository` throws on writes (LSP)
 
-**File**: `src/infrastructure/repositories/read-only-job-repository.ts`
-**Smell**: Spreads an inner `InMemoryJobRepository` and overrides `save`, `update`, `remove`, `saveFromRequest` to `throw new Error('Read-only mode: ...')`. The returned object structurally satisfies `JobRepository`, so any caller holding that port reference cannot substitute this factory's output safely.
-**Fix**: Don't model read-only-ness as a repo that pretends to satisfy the full port. Introduce a narrower `JobReadRepository` port and make `JobRepository` *extend* it for full access. Callers that only need reads depend on the narrower type.
+**File**: `src/infrastructure/jobs/readOnlyJobRepository.ts`
+**Smell**: Spreads an inner `InMemoryJobRepository` and overrides `save`, `update`, `remove`, `saveFromRequest` to `throw new Error('Read-only mode: ...')`. The returned object structurally satisfies `JobRepository`, so any caller holding that gateway reference cannot substitute this factory's output safely.
+**Fix**: Don't model read-only-ness as a repo that pretends to satisfy the full gateway. Introduce a narrower `JobReadRepository` gateway and make `JobRepository` *extend* it for full access. Callers that only need reads depend on the narrower type.
 
 ---
 
-### Violation I1 — Fat `JobRepository` port (ISP)
+### Violation I1 — Fat `JobRepository` gateway (ISP)
 
-**File**: `src/domain/ports/job-repository.ts`
-**Smell**: Port now mixes persistence (`findAll`, `save`, `update`, `remove`), business queries (`findActiveHighPayingJobs`), reporting (`getTotalJobsPosted`, `getAverageSalary`), and notifications (`sendWeeklyReport`). Every implementor must stub methods they don't need.
+**File**: `src/entities/gateways/jobRepository.ts`
+**Smell**: Gateway now mixes persistence (`findAll`, `save`, `update`, `remove`), business queries (`findActiveHighPayingJobs`), reporting (`getTotalJobsPosted`, `getAverageSalary`), and notifications (`sendWeeklyReport`). Every implementor must stub methods they don't need.
 **Fix**: Split by responsibility:
 
 ```typescript
-interface JobReadPort { findAll(): Promise<Job[]>; findById(id: string): Promise<Job | undefined>; }
-interface JobWritePort { save(j: Job): Promise<Job>; update(...): ...; remove(id: string): Promise<boolean>; }
-interface JobReportingPort { getTotalJobsPosted(): Promise<number>; getAverageSalary(): Promise<number>; }
-interface WeeklyReportPort { sendWeeklyReport(email: string): Promise<void>; }
+interface JobReadGateway { findAll(): Promise<Job[]>; findById(id: string): Promise<Job | undefined>; }
+interface JobWriteGateway { save(j: Job): Promise<Job>; update(...): ...; remove(id: string): Promise<boolean>; }
+interface JobReportingGateway { getTotalJobsPosted(): Promise<number>; getAverageSalary(): Promise<number>; }
+interface WeeklyReportGateway { sendWeeklyReport(email: string): Promise<void>; }
 ```
 
 ---
 
-### Violation I2 — Fat `JobApplicationRepository` port (ISP)
+### Violation I2 — Fat `JobApplicationRepository` gateway (ISP)
 
-**File**: `src/domain/ports/job-application-repository.ts`
+**File**: `src/entities/gateways/jobApplicationRepository.ts`
 **Smell**: CRUD (`findByJobId`, `save`) is mixed with lifecycle (`archiveOldApplications`, `sendFollowUp`), export (`exportToCsv`), and analytics (`getApplicantMetrics`).
-**Fix**: Segregate into `ApplicationReadPort`, `ApplicationWritePort`, `ApplicationLifecyclePort`, `ApplicationExportPort`, `ApplicationMetricsPort` — consumers depend on the smallest port they need.
+**Fix**: Segregate into `ApplicationReadGateway`, `ApplicationWriteGateway`, `ApplicationLifecycleGateway`, `ApplicationExportGateway`, `ApplicationMetricsGateway` — consumers depend on the smallest gateway they need.
 
 ---
 
-### Violation D4 — Missing `Clock` port
+### Violation D4 — Missing `Clock` gateway
 
 **Files**:
-- `src/domain/models/job.ts` — `postedAt: new Date()`
-- `src/application/services/job-application-service.ts` — `appliedAt: new Date()`
-- `src/application/services/audit-service.ts` — `at: new Date().toISOString()`
+- `src/entities/job.ts` — `postedAt: new Date()`
+- `src/usecases/applyToJob/applyToJobInteractor.ts` — `appliedAt: new Date()`
+- `src/usecases/auditJobEvent/auditJobEventInteractor.ts` — `at: new Date().toISOString()`
 
 **Smell**: Time is a hidden dependency. Code is non-deterministic; tests can't freeze time without resorting to `jest.useFakeTimers()` globally.
-**Fix**: Define a domain port and inject it at the composition root:
+**Fix**: Define a domain gateway and inject it at the composition root:
 
 ```typescript
-interface ClockPort { now(): Date; }
-const systemClock: ClockPort = { now: () => new Date() };
-// tests: const fixedClock: ClockPort = { now: () => new Date('2026-01-01') };
+interface ClockGateway { now(): Date; }
+const systemClock: ClockGateway = { now: () => new Date() };
+// tests: const fixedClock: ClockGateway = { now: () => new Date('2026-01-01') };
 ```
 
 ---
 
-### Violation D5 — Service reads `process.env` directly
+### Violation D5 — Usecase reads `process.env` directly
 
-**File**: `src/application/services/job-application-service.ts`
+**File**: `src/usecases/applyToJob/applyToJobInteractor.ts`
 **Line**: `const notificationsEnabled = process.env.NOTIFICATION_ENABLED !== 'false';` and `Number(process.env.NOTIFICATION_RETRIES ?? '1')`.
-**Principle**: Application services shouldn't know they're running under Node / in an env-variable world. Configuration is an infrastructure concern.
-**Fix**: Read env once at the composition root; inject a typed `NotificationPolicy` (or feature-flag port):
+**Principle**: Usecases shouldn't know they're running under Node / in an env-variable world. Configuration is an infrastructure concern.
+**Fix**: Read env once at the composition root; inject a typed `NotificationPolicy` (or feature-flag gateway):
 
 ```typescript
 interface NotificationPolicy { isEnabled(): boolean; retries(): number; }
@@ -506,28 +563,28 @@ interface NotificationPolicy { isEnabled(): boolean; retries(): number; }
 
 ### Violation E1 — Generic `Error` thrown from domain
 
-**Files**: `src/domain/models/job.ts`, `src/domain/errors/salary-limit-exceeded.ts`
-**Smell**: Prior to this exercise, `createJob()` did `throw new Error(...)` when salary exceeded env-configured max. Generic `Error` carries no domain meaning; controllers can't distinguish it from unrelated failures and must fall through to the 500 branch.
-**Fix**: Introduce a domain-specific error with fields:
+**File**: `src/entities/job.ts`
+**Line**: `throw new Error(`Salary ${salary} exceeds configured maximum ${maxSalary}`);`
+**Smell**: `createJob()` throws a generic `Error` when salary exceeds env-configured max. Generic `Error` carries no domain meaning; controllers can't distinguish it from unrelated failures and must fall through to the 500 branch. Note that a factory for this exact case (`createSalaryLimitExceededError`) already exists in `src/entities/errors/salaryLimitExceededError.ts` — it just isn't used here.
+**Fix**: Use the existing factory:
 
 ```typescript
-class SalaryLimitExceededError extends Error {
-  constructor(public readonly salary: number, public readonly max: number) {
-    super(`Salary ${salary} exceeds configured maximum ${max}`);
-    this.name = 'SalaryLimitExceededError';
-  }
-}
+import { createSalaryLimitExceededError } from './errors/salaryLimitExceededError';
+// ...
+throw createSalaryLimitExceededError(salary, maxSalary);
 ```
 
-Map it to an HTTP response only at the API boundary (which re-exposes O2).
+The error handler already has an `isSalaryLimitExceededError` branch that maps
+it to HTTP 422 with `{ salary, max }` in the body (this re-exposes O2's
+extension point).
 
 ---
 
 ### Violation E2 — Empty `catch` blocks silently swallow errors
 
 **Files**:
-- `src/application/services/job-application-service.ts` — `try { await legacyNotifier.send(...) } catch (_err) {}` and `catch (_err) { attempt += 1; }` on retry loop.
-- `src/application/services/job-service.ts` — `logJobEvent(...).catch(() => {})` on audit calls.
+- `src/usecases/applyToJob/applyToJobInteractor.ts` — `try { await legacyNotifier.send(...) } catch (_err) { /* ignored */ }` and `catch (_err) { attempt += 1; }` on the retry loop.
+- `src/usecases/{createJob,updateJob,deleteJob}/*Interactor.ts` — `auditJobEvent(...).catch(() => {})` on audit calls.
 
 **Principle**: Errors carry information. Swallowing them hides bugs, data loss, and security incidents from operators.
 **Fix**: Log with context and decide (retry, surface, or escalate):
@@ -547,44 +604,44 @@ Map it to an HTTP response only at the API boundary (which re-exposes O2).
 
 ### Violation A1 — Anemic `Job` entity
 
-**File**: `src/domain/models/job.ts`
-**Smell**: `Job` is a pure data bag. All behaviour — "is this a high-paying job?", "does this job match these filters?", "how do we update salary with audit?" — lives in services, controllers, and repositories. The domain model is bypassed.
+**File**: `src/entities/job.ts`
+**Smell**: `Job` is a pure data bag. All behaviour — "is this a high-paying job?", "does this job match these filters?", "how do we update salary with audit?" — lives in usecases, controllers, and repositories. The domain model is bypassed.
 **Principle**: Rich domain models encapsulate behaviour alongside state; an anemic model is just a struct with extra steps.
-**Fix**: Add methods on `Job` (or return an object with methods from `createJob`):
+**Fix**: Add functions that operate on `Job` and expose them alongside the type (or return them from `createJob`):
 
 ```typescript
 interface Job {
   readonly id: string;
   // ...
-  matches(filters: JobSearchFilters): boolean;
-  isHighPaying(threshold: number): boolean;
-  withUpdatedSalary(newSalary: number): Job; // immutable update
 }
+const matches = (job: Job, filters: JobSearchFilters): boolean => { ... };
+const isHighPaying = (job: Job, threshold: number): boolean => job.salary > threshold;
+const withUpdatedSalary = (job: Job, newSalary: number): Job => ({ ...job, salary: newSalary });
 ```
+
+*(Functional style preferred over classes per project convention — same
+encapsulation, no `class` keyword.)*
 
 ---
 
 ### Violation A2 — Primitive obsession on `salary` and `applicantEmail`
 
-**Files**: `src/domain/models/job.ts`, `src/domain/models/job-application.ts`
+**Files**: `src/entities/job.ts`, `src/entities/jobApplication.ts`
 **Smell**: `salary: number` (no currency, no precision, silently accepts negatives); `applicantEmail: string` (no validation on construction — only at the Zod boundary, and duplicated ad-hoc elsewhere).
-**Fix**: Introduce value objects with constructors that validate and make invalid states unrepresentable:
+**Fix**: Introduce value-object factories with validation that make invalid states unrepresentable:
 
 ```typescript
-class Money {
-  private constructor(readonly amount: number, readonly currency: 'AUD' | 'USD') {}
-  static of(amount: number, currency: 'AUD' | 'USD'): Money {
-    if (amount < 0) throw new InvalidMoneyError(amount);
-    return new Money(amount, currency);
-  }
-}
-class Email {
-  private constructor(readonly value: string) {}
-  static of(raw: string): Email {
-    if (!/^[^@\s]+@[^@\s]+$/.test(raw)) throw new InvalidEmailError(raw);
-    return new Email(raw.toLowerCase());
-  }
-}
+type Money = { readonly amount: number; readonly currency: 'AUD' | 'USD' };
+const createMoney = (amount: number, currency: 'AUD' | 'USD'): Money => {
+  if (amount < 0) throw createInvalidMoneyError(amount);
+  return { amount, currency };
+};
+
+type Email = { readonly value: string };
+const createEmail = (raw: string): Email => {
+  if (!/^[^@\s]+@[^@\s]+$/.test(raw)) throw createInvalidEmailError(raw);
+  return { value: raw.toLowerCase() };
+};
 ```
 
 Value objects kill duplicate validation, document intent, and move invariants into the type system.
@@ -593,28 +650,30 @@ Value objects kill duplicate validation, document intent, and move invariants in
 
 ### SNEAKY Violation — Domain model imports from infrastructure
 
-**File**: `src/domain/models/job.ts`
-**Line**: `import { generateId } from '../../infrastructure/utils/id-generator';`
+**File**: `src/entities/job.ts`
+**Line**: `import { generateId } from '../infrastructure/utils/idGenerator';`
 **Principle**: Dependency rule — the domain layer must never depend on infrastructure.
 **Why it's sneaky**: `generateId()` is a small utility and the code works fine. Most developers don't trace the import path and realize it crosses an architectural boundary.
-**Fix**: Either accept the `id` as a parameter in `createJob()` (and let the application layer generate it), or define an `IdGenerator` port in the domain and inject the implementation.
+**Fix**: Either accept the `id` as a parameter in `createJob()` (and let the usecase layer generate it), or define an `IdGenerator` gateway in `src/entities/gateways` and inject the implementation.
 
 ---
 
 ## Scoring Cheat Sheet
 
-- **Standard violations**: 32 (#1–10, L1–L4, D1–D5, X1–X3, O1, O2, Li1, Li2, I1, I2, E1, E2, A1, A2) × 2 pts (find + fix) = **64 pts**
+- **Standard violations**: 31 (#1–10 minus retired #10 barrel, L1/L2/L4, D1–D5, X1–X3, O1, O2, Li1, Li2, I1, I2, E1, E2, A1, A2) × 2 pts (find + fix) = **62 pts**
 - **Sneaky bonus**: +1 find + 1 fix = up to **2 bonus pts**
 
-Wait — total standard = 32 (the `S` row is the sneaky bonus, not standard). Count rows in the summary table = **33 total**, of which 32 are standard + 1 sneaky.
+*(L3 is excluded from scoring — it was neutralised by the error-type factory
+refactor. Violation #10 is also excluded because the current tree has no
+barrel file to find.)*
 
-- **Theoretical max: 64 + 2 + 2 = 68 pts** (32 × 2 standard + 2 bonus for sneaky).
+- **Theoretical max: 62 + 2 = 64 pts** (31 × 2 standard + 2 bonus for sneaky).
 
 ### Pass-mark suggestions
 
 | Rating       | Points        | Comment                                                         |
 | ------------ | ------------- | --------------------------------------------------------------- |
-| "Architect"  | 55+ (≥ 80%)   | Found almost every violation and proposed correct fixes.        |
-| "Senior"     | 44–54 (≥ 65%) | Found most layering, DIP, and SOLID violations.                 |
-| "Mid"        | 34–43 (≥ 50%) | Found code-style + surface-level architecture issues.           |
-| "Junior"     | < 34          | Reread the README and run through `docs/clean-architecture.md`. |
+| "Architect"  | 52+ (≥ 80%)   | Found almost every violation and proposed correct fixes.        |
+| "Senior"     | 42–51 (≥ 65%) | Found most layering, DIP, and SOLID violations.                 |
+| "Mid"        | 32–41 (≥ 50%) | Found code-style + surface-level architecture issues.           |
+| "Junior"     | < 32          | Reread the README and run through `docs/clean-architecture.md`. |

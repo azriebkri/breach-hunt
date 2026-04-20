@@ -9,18 +9,27 @@ Pure code-style violations (#1 `any`, #2 `as` cast, #6 `.then`, #7 curry, #8
 missing Zod on update, #10 `index.ts` barrel) were deliberately **excluded**
 per scope decision, so they are not listed here.
 
+> **Note on recent refactors**: the domain/application error types have been
+> converted from `class` definitions to factory functions (`createHttpError`,
+> `createApplicationFailedError`, `createSalaryLimitExceededError`,
+> `createJobNotFoundError`) with type-predicate discriminators. The underlying
+> architectural violations are otherwise unchanged; only the call-site syntax
+> (`throw createXxx(...)` instead of `throw new XxxError(...)`) and the error-
+> handler discrimination (`isXxxError(err)` instead of `err instanceof XxxError`)
+> are different. The `L3` row below has been **removed** because the new
+> `JobNotFoundError` factory no longer imports from the application layer.
+
 ## Clean Architecture — Layering
 
 | ID  | Principle         | File                                                                         | Line(s)           | Detail                                                                                  |
 | --- | ----------------- | ---------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------- |
-| #3  | Dependency Rule   | `src/usecases/getJob/getJobInteractor.ts`                                    | 3, 10             | `import { HttpError } from '../../application/middleware/errorHandlerMiddleware'`; usecase `throw new HttpError(404, ...)`. |
+| #3  | Dependency Rule   | `src/usecases/getJob/getJobInteractor.ts`                                    | 3, 10             | `import { createHttpError } from '../../application/middleware/errorHandlerMiddleware'`; usecase `throw createHttpError(404, ...)`. |
 | #3  | Dependency Rule   | `src/usecases/updateJob/updateJobInteractor.ts`                              | 3, 14             | Same pattern — HTTP error thrown from usecase.                                          |
 | #3  | Dependency Rule   | `src/usecases/deleteJob/deleteJobInteractor.ts`                              | 2, 10             | Same pattern — HTTP error thrown from usecase.                                          |
 | #9  | Dependency Rule   | `src/entities/gateways/notificationGateway.ts`                               | 1, 4              | `import { AxiosResponse } from 'axios'` in domain gateway; gateway returns `Promise<AxiosResponse>`. |
 | L1  | Dependency Rule   | `src/infrastructure/jobs/inMemoryJobRepository.ts`                           | 4, 8, 23–38       | Infra imports API-layer schema `CreateJobRequest`; `saveFromRequest()` consumes it.     |
 | L2  | Dependency Rule   | `src/application/jobs/getJobsByCompanyController.ts`                         | 12                | Controller calls `deps.jobRepository.findAll()` directly instead of a use case.         |
 | L2  | Dependency Rule   | `src/application/jobs/getFeaturedJobsController.ts`                          | 11                | Controller calls `deps.jobRepository.findActiveHighPayingJobs()` directly.              |
-| L3  | Dependency Rule   | `src/entities/errors/jobNotFoundError.ts`                                    | 1, 3              | Domain error `extends HttpError` (imported from application layer).                     |
 | X2  | Dependency Rule   | `src/usecases/createJob/createJobInteractor.ts`                              | 3, 16             | Usecase imports Zod schema from API layer and calls `createJobSchema.parse(...)`.       |
 | S   | Dependency Rule   | `src/entities/job.ts`                                                        | 1                 | Domain imports `generateId` from `infrastructure/utils/idGenerator`.                    |
 
@@ -36,7 +45,7 @@ per scope decision, so they are not listed here.
 | D4  | DIP       | `src/entities/job.ts`                                        | 35               | `postedAt: new Date()` — no `Clock` gateway.                                                               |
 | D4  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`            | 38               | `appliedAt: new Date()` — no `Clock` gateway.                                                              |
 | D4  | DIP       | `src/usecases/auditJobEvent/auditJobEventInteractor.ts`      | 13               | `at: new Date().toISOString()` — no `Clock` gateway.                                                       |
-| D5  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`            | 49, 51           | Usecase reads `process.env.NOTIFICATION_ENABLED` and `process.env.NOTIFICATION_RETRIES`.                   |
+| D5  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`            | 51, 53           | Usecase reads `process.env.NOTIFICATION_ENABLED` and `process.env.NOTIFICATION_RETRIES`.                   |
 
 ## Clean Architecture — Leak / Config
 
@@ -58,7 +67,7 @@ per scope decision, so they are not listed here.
 | ID  | Principle | File                                                           | Line(s)        | Detail                                                                                     |
 | --- | --------- | -------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------ |
 | O1  | OCP       | `src/usecases/formatJob/formatJobForPlatform.ts`               | 17–27, 30–36   | Growing `if (platform === 'seek') ... else if ... else if ...` chain for salary + postedAt. |
-| O2  | OCP       | `src/application/middleware/errorHandlerMiddleware.ts`         | 21–53          | Growing `if (err instanceof X) ... else if (err instanceof Y) ... else if (err.name === 'ZodError') ...` chain. |
+| O2  | OCP       | `src/application/middleware/errorHandlerMiddleware.ts`         | 25–57          | Growing `if (isHttpError(err)) ... else if (isApplicationFailedError(err)) ... else if (isSalaryLimitExceededError(err)) ... else if (err.name === 'ZodError') ...` chain — every new error type forces modifying this function. |
 
 ## SOLID — LSP (Liskov Substitution)
 
@@ -86,12 +95,18 @@ per scope decision, so they are not listed here.
 
 | ID  | Principle       | File                                                   | Line(s)  | Detail                                                                                         |
 | --- | --------------- | ------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------- |
-| E1  | Error Handling  | `src/entities/job.ts`                                  | 24       | Domain throws generic `new Error(...)` for salary-limit breach (no domain-specific error class, no metadata). |
-| E2  | Error Handling  | `src/usecases/applyToJob/applyToJobInteractor.ts`      | 47       | `catch (_err) {}` — legacy notifier failure swallowed.                                         |
-| E2  | Error Handling  | `src/usecases/applyToJob/applyToJobInteractor.ts`      | 60–62    | `catch (_err)` inside retry loop swallows every attempt failure and falls off the end.         |
+| E1  | Error Handling  | `src/entities/job.ts`                                  | 24       | Domain throws generic `new Error(...)` for salary-limit breach (no domain-specific error type, no metadata). |
+| E2  | Error Handling  | `src/usecases/applyToJob/applyToJobInteractor.ts`      | 45–49    | `try { ... } catch (_err) { /* ignored */ }` — legacy notifier failure swallowed silently.    |
+| E2  | Error Handling  | `src/usecases/applyToJob/applyToJobInteractor.ts`      | 62–64    | `catch (_err)` inside retry loop swallows every attempt failure and falls off the end.         |
 | E2  | Error Handling  | `src/usecases/createJob/createJobInteractor.ts`        | 36–38    | `auditJobEvent(...).catch(() => {})` silently swallows audit failures.                         |
 | E2  | Error Handling  | `src/usecases/updateJob/updateJobInteractor.ts`        | 17–19    | `auditJobEvent(...).catch(() => {})`.                                                          |
 | E2  | Error Handling  | `src/usecases/deleteJob/deleteJobInteractor.ts`        | 13–15    | `auditJobEvent(...).catch(() => {})`.                                                          |
+
+## Resolved / No longer present
+
+| ID  | Principle       | Original File                                | Status | Detail                                                                                         |
+| --- | --------------- | -------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------- |
+| L3  | Dependency Rule | `src/entities/errors/jobNotFoundError.ts`    | Fixed  | `JobNotFoundError` was a `class` that `extends HttpError` (imported from the application layer). It is now a factory (`createJobNotFoundError`) returning `Error & { statusCode; jobId }` — no application-layer import remains. |
 
 ## Excluded (out of scope)
 

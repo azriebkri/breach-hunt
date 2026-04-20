@@ -1,4 +1,4 @@
-import type { JobApplication } from "../jobApplication.js";
+import { JobApplication } from '../jobApplication';
 
 interface JobApplicationRepository {
   findByJobId(jobId: string): Promise<JobApplication[]>;
@@ -12,4 +12,4 @@ interface JobApplicationRepository {
   }>;
 }
 
-export type { JobApplicationRepository };
+export { JobApplicationRepository };
