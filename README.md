@@ -34,15 +34,18 @@ All tests should pass. The violations are **architectural**, not functional.
 
 ## API Endpoints
 
-| Method | Endpoint                        | Description                    |
-| ------ | ------------------------------- | ------------------------------ |
-| POST   | `/api/jobs`                     | Create a job posting           |
-| GET    | `/api/jobs`                     | List/search jobs               |
-| GET    | `/api/jobs/:id`                 | Get a specific job             |
-| PUT    | `/api/jobs/:id`                 | Update a job posting           |
-| DELETE | `/api/jobs/:id`                 | Delete a job posting           |
-| POST   | `/api/jobs/:id/applications`    | Apply to a job                 |
-| GET    | `/api/jobs/:id/applications`    | List applications for a job    |
+| Method | Endpoint                        | Description                      |
+| ------ | ------------------------------- | -------------------------------- |
+| POST   | `/api/jobs`                     | Create a job posting             |
+| GET    | `/api/jobs`                     | List jobs                        |
+| GET    | `/api/jobs/search`              | Search jobs (by location/salary) |
+| GET    | `/api/jobs/featured`            | List featured (high-paying) jobs |
+| GET    | `/api/jobs/by-company/:company` | List jobs for a given company    |
+| GET    | `/api/jobs/:id`                 | Get a specific job               |
+| PUT    | `/api/jobs/:id`                 | Update a job posting             |
+| DELETE | `/api/jobs/:id`                 | Delete a job posting             |
+| POST   | `/api/jobs/:id/applications`    | Apply to a job                   |
+| GET    | `/api/jobs/:id/applications`    | List applications for a job      |
 
 ### Example: Create a Job
 
@@ -58,25 +61,39 @@ curl -X POST http://localhost:3000/api/jobs \
   }'
 ```
 
+### Example: Apply to a Job
+
+```bash
+curl -X POST http://localhost:3000/api/jobs/<jobId>/applications \
+  -H "Content-Type: application/json" \
+  -d '{
+    "applicantName": "Ada Lovelace",
+    "applicantEmail": "ada@example.com",
+    "coverLetter": "I love building things."
+  }'
+```
+
 ---
 
 ## Architecture Overview
 
-This codebase follows **Clean Architecture** with four layers:
+This codebase follows **Clean Architecture** with four concentric layers:
 
 ```
 src/
-  domain/       → Models, Ports (interfaces), Domain Errors
-  application/  → Services, Formatters (business logic)
-  infrastructure/ → Repositories, External Clients, Utilities
-  api/          → Controllers, Middleware, Schemas, Routes
+  entities/        → Domain models, Gateways (ports), Domain Errors
+  usecases/        → Interactors (application-specific business rules)
+  application/     → Controllers, Middleware, Schemas, Routers (interface adapters)
+  infrastructure/  → Repositories, External Clients, Clock, IdGenerator, Logger
 ```
 
 **The Dependency Rule**: source code dependencies must point **inward**.
-- `domain` depends on nothing
-- `application` depends on `domain`
-- `infrastructure` implements `domain` ports
-- `api` orchestrates everything
+
+- `entities` depends on nothing
+- `usecases` depends only on `entities`
+- `application` (interface adapters) depends on `usecases` + `entities`
+- `infrastructure` implements `entities` ports
+- The composition root (`src/app.ts`) wires everything together
 
 ---
 
@@ -84,37 +101,38 @@ src/
 
 ### Your Mission
 
-This codebase has **at least 10 intentional violations** of clean architecture principles, SOLID principles, and coding standards baked in. Your job is to find and document every single one.
+This codebase has **many intentional violations** of clean architecture principles. Your job is to find and document at least minimum 10 violation.
 
 ### What Counts as a Violation
 
 Violations fall into categories including (but not limited to):
-- Clean Architecture dependency rule breaches
-- SOLID principle violations
-- TypeScript/coding style anti-patterns
-- Missing validation
-- Improper error handling patterns
+
+- Clean Architecture dependency rule breaches (inner layers reaching outward)
+- Dependency Inversion violations (depending on concretions, not abstractions)
+- Framework / transport / config leaks into inner layers
+- Misplaced responsibilities (business logic in adapters, messaging in repositories, presentation in domain, etc.)
 
 ### Scoring
 
-| Action                                           | Points |
-| ------------------------------------------------ | ------ |
-| Correctly identify a violation                   | 1 pt   |
-| Name the correct fix                             | +1 pt  |
-| Find the hidden "sneaky" violation               | Bonus  |
+| Action                         | Points |
+| ------------------------------ | ------ |
+| Correctly identify a violation | 1 pt   |
+| Name the correct fix           | +1 pt  |
 
 ### How to Document Findings
 
 For each violation, record:
+
+1. **Create** a pull request to merge into **master**
 1. **File** and **line** where the violation occurs
-2. **What** the violation is (1-2 sentences)
-3. **Which principle** it breaks
-4. **How to fix it** (for the extra point)
+1. **What** the violation is (1-2 sentences)
+1. **Which principle** it breaks
+1. **How to fix it**
 
 ### Rules
 
 - Do NOT modify the tests in `test/componentTests/` — they are your safety net
 - You may read any file in the codebase
-- Time limit: **45 minutes**
+- Time limit: **60 minutes**
 
 Good luck, and may the cleanest team win!
