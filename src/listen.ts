@@ -1,10 +1,12 @@
 import { createApp } from './app';
-import { config } from './config';
+import { loadConfig } from './config';
 
-const app = createApp();
+const config = loadConfig();
+const app = createApp(config);
 
 app.listen(config.port, () => {
   console.log(
     `Job Posting Service running on http://localhost:${config.port}`,
+    { activity: 'serverStarted', port: config.port },
   );
 });

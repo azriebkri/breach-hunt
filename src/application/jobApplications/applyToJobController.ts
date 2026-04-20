@@ -1,14 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
-import { createApplicationSchema } from './jobApplicationSchemas';
 import { createApplyToJobInteractor } from '../../usecases/applyToJob/applyToJobInteractor';
 import type { ControllerDependencies } from '../contextState';
+import { createApplicationSchema } from './jobApplicationSchemas';
 
 const createApplyToJobController = (deps: ControllerDependencies) => {
-  const interactor = createApplyToJobInteractor(
-    deps.applicationRepository,
-    deps.notificationGateway,
-    deps.jobRepository,
-  );
+  const interactor = createApplyToJobInteractor({
+    jobRepository: deps.jobRepository,
+    applicationRepository: deps.applicationRepository,
+    notificationGateway: deps.notificationGateway,
+    idGenerator: deps.idGenerator,
+    clock: deps.clock,
+    logger: deps.logger,
+    config: {
+      notificationsEnabled: deps.config.notificationsEnabled,
+      notificationRetries: deps.config.notificationRetries,
+    },
+  });
 
   const handleApplyToJob = async (
     req: Request<{ id: string }>,

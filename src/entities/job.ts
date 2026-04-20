@@ -1,4 +1,4 @@
-import { generateId } from '../infrastructure/utils/idGenerator';
+import { createSalaryLimitExceededError } from './errors/salaryLimitExceededError';
 
 interface Job {
   id: string;
@@ -10,37 +10,31 @@ interface Job {
   postedAt: Date;
 }
 
-const createJob = (
-  title: string,
-  description: string,
-  company: string,
-  location: string,
-  salary: number,
-): Job => {
-  const maxSalaryEnv = process.env.MAX_SALARY;
-  if (maxSalaryEnv) {
-    const maxSalary = Number(maxSalaryEnv);
-    if (!Number.isNaN(maxSalary) && salary > maxSalary) {
-      throw new Error(`Salary ${salary} exceeds configured maximum ${maxSalary}`);
-    }
+interface CreateJobInput {
+  id: string;
+  title: string;
+  description: string;
+  company: string;
+  location: string;
+  salary: number;
+  postedAt: Date;
+  maxSalary?: number;
+}
+
+const createJob = (input: CreateJobInput): Job => {
+  if (input.maxSalary !== undefined && input.salary > input.maxSalary) {
+    throw createSalaryLimitExceededError(input.salary, input.maxSalary);
   }
 
-  const job: Job = {
-    id: generateId(),
-    title,
-    description,
-    company,
-    location,
-    salary,
-    postedAt: new Date(),
+  return {
+    id: input.id,
+    title: input.title,
+    description: input.description,
+    company: input.company,
+    location: input.location,
+    salary: input.salary,
+    postedAt: input.postedAt,
   };
-
-  console.log('job model constructed', {
-    activity: 'jobModelCreated',
-    jobId: job.id,
-  });
-
-  return job;
 };
 
-export { Job, createJob };
+export { Job, createJob, CreateJobInput };

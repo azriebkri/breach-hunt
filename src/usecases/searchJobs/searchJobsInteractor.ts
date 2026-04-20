@@ -1,10 +1,10 @@
-import { Request } from 'express';
-import { Job } from '../../entities/job';
 import { JobRepository } from '../../entities/gateways/jobRepository';
+import { Job } from '../../entities/job';
 
 interface JobSearchFilters {
-  location?: string;
-  title?: string;
+  readonly location?: string;
+  readonly title?: string;
+  readonly minSalary?: number;
 }
 
 const createSearchJobsInteractor = (jobRepository: JobRepository) => {
@@ -21,32 +21,10 @@ const createSearchJobsInteractor = (jobRepository: JobRepository) => {
       ) {
         return false;
       }
-      return true;
-    });
-  };
-
-  const searchJobsFromRequest = async (req: Request): Promise<Job[]> => {
-    const location = req.query.location as string | undefined;
-    const title = req.query.title as string | undefined;
-    const minSalaryHeader = req.headers['x-min-salary'];
-    const minSalary =
-      typeof minSalaryHeader === 'string'
-        ? Number(minSalaryHeader)
-        : undefined;
-
-    const allJobs = await jobRepository.findAll();
-
-    return allJobs.filter((job) => {
-      if (location && job.location !== location) {
-        return false;
-      }
-      if (title && !job.title.toLowerCase().includes(title.toLowerCase())) {
-        return false;
-      }
       if (
-        minSalary !== undefined &&
-        !Number.isNaN(minSalary) &&
-        job.salary < minSalary
+        filters.minSalary !== undefined &&
+        !Number.isNaN(filters.minSalary) &&
+        job.salary < filters.minSalary
       ) {
         return false;
       }
@@ -54,7 +32,7 @@ const createSearchJobsInteractor = (jobRepository: JobRepository) => {
     });
   };
 
-  return { searchJobs, searchJobsFromRequest };
+  return { searchJobs };
 };
 
 export { createSearchJobsInteractor, JobSearchFilters };

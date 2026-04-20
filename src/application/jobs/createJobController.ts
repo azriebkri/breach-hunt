@@ -1,10 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
-import { createJobSchema } from './jobSchemas';
 import { createCreateJobInteractor } from '../../usecases/createJob/createJobInteractor';
 import type { ControllerDependencies } from '../contextState';
+import { createJobSchema } from './jobSchemas';
 
 const createCreateJobController = (deps: ControllerDependencies) => {
-  const interactor = createCreateJobInteractor(deps.jobRepository);
+  const interactor = createCreateJobInteractor({
+    jobRepository: deps.jobRepository,
+    idGenerator: deps.idGenerator,
+    clock: deps.clock,
+    logger: deps.logger,
+    auditGateway: deps.auditGateway,
+    config: { maxSalary: deps.config.maxSalary },
+  });
 
   const handleCreateJob = async (
     req: Request,

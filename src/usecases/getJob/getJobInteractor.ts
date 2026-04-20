@@ -1,13 +1,13 @@
-import { Job } from '../../entities/job';
+import { createJobNotFoundError } from '../../entities/errors/jobNotFoundError';
 import { JobRepository } from '../../entities/gateways/jobRepository';
-import { createHttpError } from '../../application/middleware/errorHandlerMiddleware';
+import { Job } from '../../entities/job';
 
 const createGetJobInteractor = (jobRepository: JobRepository) => {
   const getJobById = async (id: string): Promise<Job> => {
     const job = await jobRepository.findById(id);
 
     if (!job) {
-      throw createHttpError(404, 'Job not found');
+      throw createJobNotFoundError(id);
     }
 
     return job;

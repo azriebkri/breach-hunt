@@ -1,12 +1,11 @@
 type JobNotFoundError = Error & {
-  statusCode: number;
   jobId: string;
 };
 
 const createJobNotFoundError = (jobId: string): JobNotFoundError => {
   const base = new Error(`Job with id '${jobId}' was not found`);
   base.name = 'JobNotFoundError';
-  return Object.assign(base, { statusCode: 404, jobId });
+  return Object.assign(base, { jobId });
 };
 
 const isJobNotFoundError = (err: unknown): err is JobNotFoundError =>

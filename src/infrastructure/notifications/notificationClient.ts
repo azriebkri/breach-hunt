@@ -1,28 +1,29 @@
 import axios from 'axios';
-import { AxiosResponse } from 'axios';
+import { LoggerGateway } from '../../entities/gateways/logger';
 import { NotificationGateway } from '../../entities/gateways/notificationGateway';
-import { NOTIFICATION_API_URL_DEFAULT } from '../../constants';
 
-const NOTIFICATION_API_URL =
-  process.env.NOTIFICATION_API_URL || NOTIFICATION_API_URL_DEFAULT;
+interface NotificationClientDependencies {
+  readonly notificationApiUrl: string;
+  readonly logger: LoggerGateway;
+}
 
-const createNotificationClient = (): NotificationGateway => {
-  const send = async (
-    email: string,
-    message: string,
-  ): Promise<AxiosResponse> => {
+const createNotificationClient = (
+  deps: NotificationClientDependencies,
+): NotificationGateway => {
+  const send = async (email: string, message: string): Promise<void> => {
     try {
-      const response = await axios.post(
-        `${NOTIFICATION_API_URL}/api/notify`,
-        { email, message },
-      );
-      console.log('Notification sent successfully', {
+      const response = await axios.post(`${deps.notificationApiUrl}/api/notify`, {
+        email,
+        message,
+      });
+      deps.logger.info('notification sent successfully', {
+        activity: 'notificationSent',
         status: response.status,
       });
-      return response;
     } catch (error) {
-      console.error('Failed to send notification', {
-        error: (error as Error).message,
+      deps.logger.error('failed to send notification', {
+        activity: 'notificationFailed',
+        reason: (error as Error).message,
       });
       throw error;
     }
@@ -31,4 +32,4 @@ const createNotificationClient = (): NotificationGateway => {
   return { send };
 };
 
-export { createNotificationClient };
+export { createNotificationClient, NotificationClientDependencies };

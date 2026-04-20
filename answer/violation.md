@@ -1,4 +1,4 @@
-## Clean Architecture — Layering
+## Clean Architecture — Layering (Dependency Rule)
 
 | ID  | Principle       | File                                                 | Line(s)     | Detail                                                                                                                              |
 | --- | --------------- | ---------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -11,72 +11,41 @@
 | L2  | Dependency Rule | `src/application/jobs/getFeaturedJobsController.ts`  | 11          | Controller calls `deps.jobRepository.findActiveHighPayingJobs()` directly.                                                          |
 | X2  | Dependency Rule | `src/usecases/createJob/createJobInteractor.ts`      | 1, 16       | Usecase imports Zod schema from API layer and calls `createJobSchema.parse(...)`.                                                   |
 | S   | Dependency Rule | `src/entities/job.ts`                                | 1           | Domain imports `generateId` from `infrastructure/utils/idGenerator`.                                                                |
+| L5  | Dependency Rule | `src/usecases/applyToJob/applyToJobInteractor.ts`    | 6, 33       | Usecase imports `generateId` from `infrastructure/utils/idGenerator` and calls it inline (mirrors `S` on the entity).               |
+| L6  | Layer misplacement | `src/usecases/auditJobEvent/auditJobEventInteractor.ts` | 1–15   | File lives under `usecases/` but is pure infrastructure (imports `axios`, posts to `AUDIT_URL`); other usecases import it as if it were a use case, hiding the infra dependency. |
 
 ## Clean Architecture — Dependency Inversion (DIP)
 
-| ID  | Principle | File                                                    | Line(s) | Detail                                                                                                   |
-| --- | --------- | ------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------- |
-| #5  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 4, 18   | Usecase parameter typed as concrete `InMemoryJobRepository` instead of the port.                         |
-| D1  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 5, 20   | Usecase instantiates `createNotificationClient()` even though `notificationGateway` is already injected. |
-| D2  | DIP       | `src/usecases/auditJobEvent/auditJobEventInteractor.ts` | 1, 10   | Usecase imports `axios` and calls `axios.post(AUDIT_URL, ...)` directly (no gateway).                    |
-| X1  | DIP       | `src/entities/job.ts`                                   | 38      | Domain uses `console.log(...)` instead of a `LoggerGateway`.                                             |
-| X1  | DIP       | `src/usecases/createJob/createJobInteractor.ts`         | 27      | Usecase uses `console.log(...)` instead of a `LoggerGateway`.                                            |
-| D4  | DIP       | `src/entities/job.ts`                                   | 35      | `postedAt: new Date()` — no `Clock` gateway.                                                             |
-| D4  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 38      | `appliedAt: new Date()` — no `Clock` gateway.                                                            |
-| D4  | DIP       | `src/usecases/auditJobEvent/auditJobEventInteractor.ts` | 13      | `at: new Date().toISOString()` — no `Clock` gateway.                                                     |
-| D5  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 51, 53  | Usecase reads `process.env.NOTIFICATION_ENABLED` and `process.env.NOTIFICATION_RETRIES`.                 |
+| ID  | Principle | File                                                    | Line(s) | Detail                                                                                                                            |
+| --- | --------- | ------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| #5  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 4, 18   | Usecase parameter typed as concrete `InMemoryJobRepository` instead of the port.                                                  |
+| D1  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 5, 20   | Usecase instantiates `createNotificationClient()` even though `notificationGateway` is already injected.                          |
+| D2  | DIP       | `src/usecases/auditJobEvent/auditJobEventInteractor.ts` | 1, 10   | Usecase imports `axios` and calls `axios.post(AUDIT_URL, ...)` directly (no gateway).                                             |
+| X1  | DIP       | `src/entities/job.ts`                                   | 38      | Domain uses `console.log(...)` instead of a `LoggerGateway`.                                                                      |
+| X1  | DIP       | `src/usecases/createJob/createJobInteractor.ts`         | 27      | Usecase uses `console.log(...)` instead of a `LoggerGateway`.                                                                     |
+| D4  | DIP       | `src/entities/job.ts`                                   | 35      | `postedAt: new Date()` — no `Clock` gateway.                                                                                      |
+| D4  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 38      | `appliedAt: new Date()` — no `Clock` gateway.                                                                                     |
+| D4  | DIP       | `src/usecases/auditJobEvent/auditJobEventInteractor.ts` | 13      | `at: new Date().toISOString()` — no `Clock` gateway.                                                                              |
+| D5  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 51, 53  | Usecase reads `process.env.NOTIFICATION_ENABLED` and `process.env.NOTIFICATION_RETRIES`.                                          |
+| D6  | DIP       | `src/application/contextState.ts`                       | 3, 6    | `ControllerDependencies.jobRepository: InMemoryJobRepository` — the interface-adapter DI contract is typed with the concrete infra implementation instead of the `JobRepository` port, so every controller that receives `deps` is coupled to infra (including the non-port `saveFromRequest`). |
 
-## Clean Architecture — Leak / Config
+## Clean Architecture — Framework & Config Leaks
 
-| ID  | Principle      | File                                              | Line(s)  | Detail                                                                            |
-| --- | -------------- | ------------------------------------------------- | -------- | --------------------------------------------------------------------------------- |
-| L4  | Framework leak | `src/usecases/searchJobs/searchJobsInteractor.ts` | 1, 28–35 | `searchJobsFromRequest(req: Request)` — Express `Request` consumed by a use case. |
-| D3  | Config leak    | `src/entities/job.ts`                             | 20       | Domain reads `process.env.MAX_SALARY` directly.                                   |
+| ID  | Principle      | File                                                   | Line(s) | Detail                                                                                                                                              |
+| --- | -------------- | ------------------------------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| L4  | Framework leak | `src/usecases/searchJobs/searchJobsInteractor.ts`      | 1, 28–35 | `searchJobsFromRequest(req: Request)` — Express `Request` consumed by a use case.                                                                  |
+| L4  | Framework leak | `src/usecases/searchJobs/searchJobsInteractor.ts`      | 31–35   | Same usecase reaches into `req.headers['x-min-salary']`, pulling transport-level HTTP header semantics into business logic.                         |
+| D3  | Config leak    | `src/entities/job.ts`                                  | 20      | Domain reads `process.env.MAX_SALARY` directly.                                                                                                     |
+| D7  | Framework leak | `src/entities/errors/jobNotFoundError.ts`              | 1–9     | Domain error carries `statusCode: 404` — HTTP transport concern bleeds into a domain error type so outer layers can't own the HTTP mapping.         |
+| D8  | Config leak    | `src/infrastructure/notifications/notificationClient.ts` | 6–7   | Module-level `process.env.NOTIFICATION_API_URL` read at import time bypasses the composition root; the gateway can't be reconfigured or tested without mutating global env. |
 
-## Clean Architecture — SRP (Single Responsibility)
+## Clean Architecture — Misplaced Responsibility
 
-| ID  | Principle | File                                               | Line(s) | Detail                                                                                                        |
-| --- | --------- | -------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
-| #4  | SRP       | `src/application/jobs/listJobsController.ts`       | 19–25   | Controller holds business logic (`.filter(...).filter(...).sort(...)`) instead of delegating to the use case. |
-| X3  | SRP       | `src/entities/gateways/jobRepository.ts`           | 12      | Business rule `findActiveHighPayingJobs()` exposed on the gateway.                                            |
-| X3  | SRP       | `src/infrastructure/jobs/inMemoryJobRepository.ts` | 41–46   | Repo encodes `salary > HIGH_SALARY_THRESHOLD` filter + sort.                                                  |
-
-## SOLID — OCP (Open/Closed)
-
-| ID  | Principle | File                                                   | Line(s)      | Detail                                                                                                                                                                                                                           |
-| --- | --------- | ------------------------------------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| O1  | OCP       | `src/usecases/formatJob/formatJobForPlatform.ts`       | 15–25, 28–34 | Growing `if (platform === 'seek') ... else if ... else if ...` chain for salary + postedAt.                                                                                                                                      |
-| O2  | OCP       | `src/application/middleware/errorHandlerMiddleware.ts` | 25–57        | Growing `if (isHttpError(err)) ... else if (isApplicationFailedError(err)) ... else if (isSalaryLimitExceededError(err)) ... else if (err.name === 'ZodError') ...` chain — every new error type forces modifying this function. |
-
-## SOLID — LSP (Liskov Substitution)
-
-| ID  | Principle | File                                                              | Line(s) | Detail                                                                                                              |
-| --- | --------- | ----------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
-| Li1 | LSP       | `src/infrastructure/notifications/throttledNotificationClient.ts` | 25–34   | When throttled, returns a synthetic `AxiosResponse` without calling the inner `send`.                               |
-| Li2 | LSP       | `src/infrastructure/jobs/readOnlyJobRepository.ts`                | 10–16   | Implements the full `JobRepository` surface but throws on every write (`save`/`update`/`remove`/`saveFromRequest`). |
-
-## SOLID — ISP (Interface Segregation)
-
-| ID  | Principle | File                                                | Line(s) | Detail                                                                                                                                                                   |
-| --- | --------- | --------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| I1  | ISP       | `src/entities/gateways/jobRepository.ts`            | 3–16    | Fat gateway: CRUD + `findActiveHighPayingJobs` + `getTotalJobsPosted` + `sendWeeklyReport` + `getAverageSalary` on a single interface (lines 12–15 are the extra roles). |
-| I2  | ISP       | `src/entities/gateways/jobApplicationRepository.ts` | 3–13    | Fat gateway: CRUD + `archiveOldApplications` + `sendFollowUp` + `exportToCsv` + `getApplicantMetrics` on a single interface (lines 6–12 are the extra roles).            |
-
-## DDD
-
-| ID  | Principle           | File                             | Line(s) | Detail                                                                                                  |
-| --- | ------------------- | -------------------------------- | ------- | ------------------------------------------------------------------------------------------------------- |
-| A1  | Anemic domain model | `src/entities/job.ts`            | 3–11    | `Job` is a pure data struct; no `matches`, `isHighPaying`, `withUpdatedSalary` behaviour on the entity. |
-| A2  | Primitive obsession | `src/entities/job.ts`            | 9       | `salary: number` — no `Money` / `Salary` value object.                                                  |
-| A2  | Primitive obsession | `src/entities/jobApplication.ts` | 5       | `applicantEmail: string` — no `Email` value object.                                                     |
-
-## Error Handling
-
-| ID  | Principle      | File                                              | Line(s) | Detail                                                                                                       |
-| --- | -------------- | ------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------ |
-| E1  | Error Handling | `src/entities/job.ts`                             | 24      | Domain throws generic `new Error(...)` for salary-limit breach (no domain-specific error type, no metadata). |
-| E2  | Error Handling | `src/usecases/applyToJob/applyToJobInteractor.ts` | 45–49   | `try { ... } catch (_err) { /* ignored */ }` — legacy notifier failure swallowed silently.                   |
-| E2  | Error Handling | `src/usecases/applyToJob/applyToJobInteractor.ts` | 62–64   | `catch (_err)` inside retry loop swallows every attempt failure and falls off the end.                       |
-| E2  | Error Handling | `src/usecases/createJob/createJobInteractor.ts`   | 36–38   | `auditJobEvent(...).catch(() => {})` silently swallows audit failures.                                       |
-| E2  | Error Handling | `src/usecases/updateJob/updateJobInteractor.ts`   | 17–19   | `auditJobEvent(...).catch(() => {})`.                                                                        |
-| E2  | Error Handling | `src/usecases/deleteJob/deleteJobInteractor.ts`   | 13–15   | `auditJobEvent(...).catch(() => {})`.                                                                        |
+| ID  | Principle                | File                                                              | Line(s) | Detail                                                                                                                                                    |
+| --- | ------------------------ | ----------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #4  | Business logic in adapter | `src/application/jobs/listJobsController.ts`                     | 19–25   | Controller holds business logic (`.filter(...).filter(...).sort(...)`) instead of delegating to the use case.                                             |
+| X3  | Business rule on port    | `src/entities/gateways/jobRepository.ts`                          | 12      | Business rule `findActiveHighPayingJobs()` exposed on the gateway.                                                                                        |
+| X3  | Business rule in infra   | `src/infrastructure/jobs/inMemoryJobRepository.ts`                | 41–46   | Repo encodes `salary > HIGH_SALARY_THRESHOLD` filter + sort.                                                                                              |
+| M1  | Repository does messaging | `src/infrastructure/jobs/inMemoryJobRepository.ts`               | 50–59   | `sendWeeklyReport` performs `axios.post(WEEKLY_REPORT_URL, ...)` — a persistence adapter is also acting as a messaging driver; belongs behind its own port. |
+| M2  | Repository does messaging | `src/infrastructure/jobApplications/inMemoryJobApplicationRepository.ts` | 23–30 | `sendFollowUp` performs `axios.post(FOLLOW_UP_URL, ...)` — same repo/messaging conflation as `M1`.                                                      |
+| M3  | Framework in infra logging | `src/infrastructure/notifications/notificationClient.ts`        | 19, 24  | Infra adapter calls `console.log` / `console.error` directly instead of going through a `LoggerGateway`, so the logging concern is hard-wired to stdout. |

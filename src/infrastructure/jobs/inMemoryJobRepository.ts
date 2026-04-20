@@ -1,15 +1,7 @@
-import axios from 'axios';
-
-import { CreateJobRequest } from '../../application/jobs/jobSchemas';
-import { HIGH_SALARY_THRESHOLD, WEEKLY_REPORT_URL } from '../../constants';
 import { JobRepository } from '../../entities/gateways/jobRepository';
 import { Job } from '../../entities/job';
 
-interface InMemoryJobRepositoryApi extends JobRepository {
-  saveFromRequest(id: string, request: CreateJobRequest): Promise<Job>;
-}
-
-const createInMemoryJobRepository = (): InMemoryJobRepositoryApi => {
+const createInMemoryJobRepository = (): JobRepository => {
   const jobs = new Map<string, Job>();
 
   const findAll = async (): Promise<Job[]> => Array.from(jobs.values());
@@ -19,52 +11,6 @@ const createInMemoryJobRepository = (): InMemoryJobRepositoryApi => {
   const save = async (job: Job): Promise<Job> => {
     jobs.set(job.id, job);
     return job;
-  };
-
-  const saveFromRequest = async (
-    id: string,
-    request: CreateJobRequest,
-  ): Promise<Job> => {
-    const job: Job = {
-      id,
-      title: request.title,
-      description: request.description,
-      company: request.company,
-      location: request.location,
-      salary: request.salary,
-      postedAt: new Date(),
-    };
-    jobs.set(job.id, job);
-    return job;
-  };
-
-  const findActiveHighPayingJobs = async (): Promise<Job[]> => {
-    const all = Array.from(jobs.values());
-    return all
-      .filter((job) => job.salary > HIGH_SALARY_THRESHOLD)
-      .sort((a, b) => b.postedAt.getTime() - a.postedAt.getTime());
-  };
-
-  const getTotalJobsPosted = async (): Promise<number> => jobs.size;
-
-  const sendWeeklyReport = async (email: string): Promise<void> => {
-    const total = jobs.size;
-    const summary = Array.from(jobs.values())
-      .map((job) => `${job.title} @ ${job.company}`)
-      .join('\n');
-    await axios.post(WEEKLY_REPORT_URL, {
-      to: email,
-      body: `Total jobs: ${total}\n\n${summary}`,
-    });
-  };
-
-  const getAverageSalary = async (): Promise<number> => {
-    const all = Array.from(jobs.values());
-    if (all.length === 0) {
-      return 0;
-    }
-    const total = all.reduce((sum, job) => sum + job.salary, 0);
-    return total / all.length;
   };
 
   const update = async (
@@ -88,16 +34,9 @@ const createInMemoryJobRepository = (): InMemoryJobRepositoryApi => {
     findAll,
     findById,
     save,
-    saveFromRequest,
-    findActiveHighPayingJobs,
-    getTotalJobsPosted,
-    sendWeeklyReport,
-    getAverageSalary,
     update,
     remove,
   };
 };
 
-type InMemoryJobRepository = ReturnType<typeof createInMemoryJobRepository>;
-
-export { createInMemoryJobRepository, InMemoryJobRepository };
+export { createInMemoryJobRepository };

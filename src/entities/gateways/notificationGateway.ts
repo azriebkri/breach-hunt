@@ -1,7 +1,5 @@
-import type { AxiosResponse } from "axios";
-
 interface NotificationGateway {
-  send(email: string, message: string): Promise<AxiosResponse>;
+  send(email: string, message: string): Promise<void>;
 }
 
 export type { NotificationGateway };

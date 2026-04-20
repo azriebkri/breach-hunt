@@ -11,20 +11,13 @@ const createListJobsController = (deps: ControllerDependencies) => {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const location = req.query.location as string | undefined;
-      const title = req.query.title as string | undefined;
+      const location =
+        typeof req.query.location === 'string' ? req.query.location : undefined;
+      const title =
+        typeof req.query.title === 'string' ? req.query.title : undefined;
 
-      const allJobs = await interactor.getAllJobs();
-
-      const filtered = allJobs
-        .filter((job) => !location || job.location === location)
-        .filter(
-          (job) =>
-            !title || job.title.toLowerCase().includes(title.toLowerCase()),
-        )
-        .sort((a, b) => b.postedAt.getTime() - a.postedAt.getTime());
-
-      res.json(filtered);
+      const jobs = await interactor.getAllJobs({ location, title });
+      res.json(jobs);
     } catch (error) {
       next(error);
     }

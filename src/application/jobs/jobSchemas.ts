@@ -8,6 +8,9 @@ const createJobSchema = z.object({
   salary: z.number().positive('Salary must be positive'),
 });
 
-type CreateJobRequest = z.infer<typeof createJobSchema>;
+const updateJobSchema = createJobSchema.partial();
 
-export { createJobSchema, CreateJobRequest };
+type CreateJobRequest = z.infer<typeof createJobSchema>;
+type UpdateJobRequest = z.infer<typeof updateJobSchema>;
+
+export { createJobSchema, updateJobSchema, CreateJobRequest, UpdateJobRequest };

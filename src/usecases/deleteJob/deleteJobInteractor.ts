@@ -1,21 +1,34 @@
+import { createJobNotFoundError } from '../../entities/errors/jobNotFoundError';
+import { AuditGateway } from '../../entities/gateways/auditGateway';
 import { JobRepository } from '../../entities/gateways/jobRepository';
-import { createHttpError } from '../../application/middleware/errorHandlerMiddleware';
-import { auditJobEvent } from '../auditJobEvent/auditJobEventInteractor';
+import { LoggerGateway } from '../../entities/gateways/logger';
 
-const createDeleteJobInteractor = (jobRepository: JobRepository) => {
+interface DeleteJobInteractorDependencies {
+  readonly jobRepository: JobRepository;
+  readonly auditGateway: AuditGateway;
+  readonly logger: LoggerGateway;
+}
+
+const createDeleteJobInteractor = (deps: DeleteJobInteractorDependencies) => {
   const removeJob = async (id: string): Promise<void> => {
-    const removed = await jobRepository.remove(id);
+    const removed = await deps.jobRepository.remove(id);
 
     if (!removed) {
-      throw createHttpError(404, 'Job not found');
+      throw createJobNotFoundError(id);
     }
 
-    auditJobEvent('job.removed', { jobId: id }).catch(() => {
-      // swallow audit failures so the main flow is not interrupted
-    });
+    try {
+      await deps.auditGateway.publish('job.removed', { jobId: id });
+    } catch (error) {
+      deps.logger.warn('audit event publish failed', {
+        activity: 'auditPublishFailed',
+        jobId: id,
+        reason: (error as Error).message,
+      });
+    }
   };
 
   return { removeJob };
 };
 
-export { createDeleteJobInteractor };
+export { createDeleteJobInteractor, DeleteJobInteractorDependencies };

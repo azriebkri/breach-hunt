@@ -1,10 +1,11 @@
-import { JobApplication } from '../../entities/jobApplication';
-import { JobApplicationRepository } from '../../entities/gateways/jobApplicationRepository';
-import { NotificationGateway } from '../../entities/gateways/notificationGateway';
-import { InMemoryJobRepository } from '../../infrastructure/jobs/inMemoryJobRepository';
-import { createNotificationClient } from '../../infrastructure/notifications/notificationClient';
-import { generateId } from '../../infrastructure/utils/idGenerator';
 import { createApplicationFailedError } from '../../entities/errors/applicationFailedError';
+import { Clock } from '../../entities/gateways/clock';
+import { IdGenerator } from '../../entities/gateways/idGenerator';
+import { JobApplicationRepository } from '../../entities/gateways/jobApplicationRepository';
+import { JobRepository } from '../../entities/gateways/jobRepository';
+import { LoggerGateway } from '../../entities/gateways/logger';
+import { NotificationGateway } from '../../entities/gateways/notificationGateway';
+import { JobApplication } from '../../entities/jobApplication';
 
 interface CreateApplicationParams {
   applicantName: string;
@@ -12,58 +13,77 @@ interface CreateApplicationParams {
   coverLetter: string;
 }
 
-const createApplyToJobInteractor = (
-  applicationRepository: JobApplicationRepository,
-  notificationGateway: NotificationGateway,
-  jobRepository: InMemoryJobRepository,
-) => {
-  const legacyNotifier = createNotificationClient();
+interface ApplyToJobConfig {
+  readonly notificationsEnabled: boolean;
+  readonly notificationRetries: number;
+}
 
+interface ApplyToJobInteractorDependencies {
+  readonly jobRepository: JobRepository;
+  readonly applicationRepository: JobApplicationRepository;
+  readonly notificationGateway: NotificationGateway;
+  readonly idGenerator: IdGenerator;
+  readonly clock: Clock;
+  readonly logger: LoggerGateway;
+  readonly config: ApplyToJobConfig;
+}
+
+const createApplyToJobInteractor = (
+  deps: ApplyToJobInteractorDependencies,
+) => {
   const applyToJob = async (
     jobId: string,
     params: CreateApplicationParams,
   ): Promise<JobApplication> => {
-    const job = await jobRepository.findById(jobId);
+    const job = await deps.jobRepository.findById(jobId);
 
     if (!job) {
-      throw createApplicationFailedError(jobId, 'The job posting does not exist');
+      throw createApplicationFailedError(
+        jobId,
+        'The job posting does not exist',
+      );
     }
 
     const application: JobApplication = {
-      id: generateId(),
+      id: deps.idGenerator.next(),
       jobId,
       applicantName: params.applicantName,
       applicantEmail: params.applicantEmail,
       coverLetter: params.coverLetter,
-      appliedAt: new Date(),
+      appliedAt: deps.clock.now(),
     };
 
-    const saved = await applicationRepository.save(application);
+    const saved = await deps.applicationRepository.save(application);
+
+    if (!deps.config.notificationsEnabled) {
+      return saved;
+    }
 
     const message = `Your application for "${job.title}" at ${job.company} has been received.`;
+    const retries = Math.max(1, deps.config.notificationRetries);
 
-    try {
-      await legacyNotifier.send(params.applicantEmail, message);
-    } catch (_err) {
-      // legacy notifier is best-effort; failures are intentionally ignored
-    }
-
-    const notificationsEnabled = process.env.NOTIFICATION_ENABLED !== 'false';
-    const notificationRetries = Number(
-      process.env.NOTIFICATION_RETRIES ?? '1',
-    );
-
-    if (notificationsEnabled) {
-      let attempt = 0;
-      while (attempt < notificationRetries) {
-        try {
-          await notificationGateway.send(params.applicantEmail, message);
-          break;
-        } catch (_err) {
-          attempt += 1;
-        }
+    let lastError: unknown;
+    for (let attempt = 0; attempt < retries; attempt += 1) {
+      try {
+        await deps.notificationGateway.send(params.applicantEmail, message);
+        return saved;
+      } catch (error) {
+        lastError = error;
+        deps.logger.warn('notification attempt failed', {
+          activity: 'notificationAttemptFailed',
+          jobId,
+          attempt: attempt + 1,
+          reason: (error as Error).message,
+        });
       }
     }
+
+    deps.logger.error('notification retries exhausted', {
+      activity: 'notificationRetriesExhausted',
+      jobId,
+      attempts: retries,
+      reason: (lastError as Error | undefined)?.message,
+    });
 
     return saved;
   };
@@ -71,4 +91,9 @@ const createApplyToJobInteractor = (
   return { applyToJob };
 };
 
-export { createApplyToJobInteractor, CreateApplicationParams };
+export {
+  createApplyToJobInteractor,
+  CreateApplicationParams,
+  ApplyToJobConfig,
+  ApplyToJobInteractorDependencies,
+};

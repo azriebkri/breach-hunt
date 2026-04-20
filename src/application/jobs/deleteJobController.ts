@@ -3,7 +3,11 @@ import { createDeleteJobInteractor } from '../../usecases/deleteJob/deleteJobInt
 import type { ControllerDependencies } from '../contextState';
 
 const createDeleteJobController = (deps: ControllerDependencies) => {
-  const interactor = createDeleteJobInteractor(deps.jobRepository);
+  const interactor = createDeleteJobInteractor({
+    jobRepository: deps.jobRepository,
+    auditGateway: deps.auditGateway,
+    logger: deps.logger,
+  });
 
   const handleDeleteJob = async (
     req: Request<{ id: string }>,

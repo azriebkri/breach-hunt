@@ -9,10 +9,6 @@ interface JobRepository {
     updates: Partial<Omit<Job, 'id' | 'postedAt'>>,
   ): Promise<Job | undefined>;
   remove(id: string): Promise<boolean>;
-  findActiveHighPayingJobs(): Promise<Job[]>;
-  getTotalJobsPosted(): Promise<number>;
-  sendWeeklyReport(email: string): Promise<void>;
-  getAverageSalary(): Promise<number>;
 }
 
 export { JobRepository };
