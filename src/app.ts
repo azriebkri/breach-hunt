@@ -1,18 +1,18 @@
 import express from 'express';
 import { createRoutes } from './api/routes';
 import { errorHandler } from './api/middleware/error-handler';
-import { InMemoryJobRepository } from './infrastructure/repositories/in-memory-job-repository';
-import { InMemoryJobApplicationRepository } from './infrastructure/repositories/in-memory-job-application-repository';
-import { ThrottledNotificationClient } from './infrastructure/external/throttled-notification-client';
+import { createInMemoryJobRepository } from './infrastructure/repositories/in-memory-job-repository';
+import { createInMemoryJobApplicationRepository } from './infrastructure/repositories/in-memory-job-application-repository';
+import { createThrottledNotificationClient } from './infrastructure/external/throttled-notification-client';
 
 const createApp = () => {
   const app = express();
 
   app.use(express.json());
 
-  const jobRepository = new InMemoryJobRepository();
-  const applicationRepository = new InMemoryJobApplicationRepository();
-  const notificationPort = new ThrottledNotificationClient();
+  const jobRepository = createInMemoryJobRepository();
+  const applicationRepository = createInMemoryJobApplicationRepository();
+  const notificationPort = createThrottledNotificationClient();
 
   const routes = createRoutes({
     jobRepository,

@@ -3,23 +3,23 @@ import { Job } from '../../domain/models/job';
 import { JobRepository } from '../../domain/ports/job-repository';
 import { CreateJobRequest } from '../../api/schemas/job-schemas';
 
-class InMemoryJobRepository implements JobRepository {
-  private jobs: Map<string, Job> = new Map();
+interface InMemoryJobRepositoryApi extends JobRepository {
+  saveFromRequest(id: string, request: CreateJobRequest): Promise<Job>;
+}
 
-  async findAll(): Promise<Job[]> {
-    return Array.from(this.jobs.values());
-  }
+const createInMemoryJobRepository = (): InMemoryJobRepositoryApi => {
+  const jobs = new Map<string, Job>();
 
-  async findById(id: string): Promise<Job | undefined> {
-    return this.jobs.get(id);
-  }
+  const findAll = async (): Promise<Job[]> => Array.from(jobs.values());
 
-  async save(job: Job): Promise<Job> {
-    this.jobs.set(job.id, job);
+  const findById = async (id: string): Promise<Job | undefined> => jobs.get(id);
+
+  const save = async (job: Job): Promise<Job> => {
+    jobs.set(job.id, job);
     return job;
-  }
+  };
 
-  async saveFromRequest(id: string, request: CreateJobRequest): Promise<Job> {
+  const saveFromRequest = async (id: string, request: CreateJobRequest): Promise<Job> => {
     const job: Job = {
       id,
       title: request.title,
@@ -29,55 +29,69 @@ class InMemoryJobRepository implements JobRepository {
       salary: request.salary,
       postedAt: new Date(),
     };
-    this.jobs.set(job.id, job);
+    jobs.set(job.id, job);
     return job;
-  }
+  };
 
-  async findActiveHighPayingJobs(): Promise<Job[]> {
+  const findActiveHighPayingJobs = async (): Promise<Job[]> => {
     const HIGH_SALARY_THRESHOLD = 100000;
-    const all = Array.from(this.jobs.values());
+    const all = Array.from(jobs.values());
     return all
       .filter((job) => job.salary > HIGH_SALARY_THRESHOLD)
       .sort((a, b) => b.postedAt.getTime() - a.postedAt.getTime());
-  }
+  };
 
-  async getTotalJobsPosted(): Promise<number> {
-    return this.jobs.size;
-  }
+  const getTotalJobsPosted = async (): Promise<number> => jobs.size;
 
-  async sendWeeklyReport(email: string): Promise<void> {
-    const total = this.jobs.size;
-    const summary = Array.from(this.jobs.values())
+  const sendWeeklyReport = async (email: string): Promise<void> => {
+    const total = jobs.size;
+    const summary = Array.from(jobs.values())
       .map((job) => `${job.title} @ ${job.company}`)
       .join('\n');
     await axios.post('http://localhost:9999/reports/weekly', {
       to: email,
       body: `Total jobs: ${total}\n\n${summary}`,
     });
-  }
+  };
 
-  async getAverageSalary(): Promise<number> {
-    const all = Array.from(this.jobs.values());
+  const getAverageSalary = async (): Promise<number> => {
+    const all = Array.from(jobs.values());
     if (all.length === 0) return 0;
     const total = all.reduce((sum, job) => sum + job.salary, 0);
     return total / all.length;
-  }
+  };
 
-  async update(id: string, updates: Partial<Omit<Job, 'id' | 'postedAt'>>): Promise<Job | undefined> {
-    const existing = this.jobs.get(id);
+  const update = async (
+    id: string,
+    updates: Partial<Omit<Job, 'id' | 'postedAt'>>,
+  ): Promise<Job | undefined> => {
+    const existing = jobs.get(id);
 
     if (!existing) {
       return undefined;
     }
 
     const updated: Job = { ...existing, ...updates };
-    this.jobs.set(id, updated);
+    jobs.set(id, updated);
     return updated;
-  }
+  };
 
-  async remove(id: string): Promise<boolean> {
-    return this.jobs.delete(id);
-  }
-}
+  const remove = async (id: string): Promise<boolean> => jobs.delete(id);
 
-export { InMemoryJobRepository };
+  return {
+    findAll,
+    findById,
+    save,
+    saveFromRequest,
+    findActiveHighPayingJobs,
+    getTotalJobsPosted,
+    sendWeeklyReport,
+    getAverageSalary,
+    update,
+    remove,
+  };
+};
+
+type InMemoryJobRepository = ReturnType<typeof createInMemoryJobRepository>;
+
+export { createInMemoryJobRepository, InMemoryJobRepository };

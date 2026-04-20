@@ -2,7 +2,7 @@ import { JobApplication } from '../../domain/models/job-application';
 import { JobApplicationRepository } from '../../domain/ports/job-application-repository';
 import { NotificationPort } from '../../domain/ports/notification-port';
 import { InMemoryJobRepository } from '../../infrastructure/repositories/in-memory-job-repository';
-import { NotificationClient } from '../../infrastructure/external/notification-client';
+import { createNotificationClient } from '../../infrastructure/external/notification-client';
 import { generateId } from '../../infrastructure/utils/id-generator';
 import { ApplicationFailedError } from '../../domain/errors/application-failed';
 
@@ -17,7 +17,7 @@ const createJobApplicationService = (
   notificationPort: NotificationPort,
   jobRepository: InMemoryJobRepository,
 ) => {
-  const legacyNotifier = new NotificationClient();
+  const legacyNotifier = createNotificationClient();
 
   const applyToJob = async (jobId: string, params: CreateApplicationParams): Promise<JobApplication> => {
     const job = await jobRepository.findById(jobId);

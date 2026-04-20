@@ -1,21 +1,25 @@
 import { AxiosResponse } from 'axios';
-import { NotificationClient } from './notification-client';
+import { NotificationPort } from '../../domain/ports/notification-port';
+import { createNotificationClient } from './notification-client';
 
-class ThrottledNotificationClient extends NotificationClient {
-  private sendCount = 0;
-  private windowStart = Date.now();
-  private readonly throttleLimit = 10;
-  private readonly windowMs = 1000;
+const THROTTLE_LIMIT = 10;
+const WINDOW_MS = 1000;
 
-  async send(email: string, message: string): Promise<AxiosResponse> {
+const createThrottledNotificationClient = (
+  inner: NotificationPort = createNotificationClient(),
+): NotificationPort => {
+  let sendCount = 0;
+  let windowStart = Date.now();
+
+  const send = async (email: string, message: string): Promise<AxiosResponse> => {
     const now = Date.now();
-    if (now - this.windowStart > this.windowMs) {
-      this.sendCount = 0;
-      this.windowStart = now;
+    if (now - windowStart > WINDOW_MS) {
+      sendCount = 0;
+      windowStart = now;
     }
-    this.sendCount += 1;
+    sendCount += 1;
 
-    if (this.sendCount > this.throttleLimit) {
+    if (sendCount > THROTTLE_LIMIT) {
       const fakeResponse = {
         data: { throttled: true },
         status: 429,
@@ -26,8 +30,10 @@ class ThrottledNotificationClient extends NotificationClient {
       return fakeResponse;
     }
 
-    return super.send(email, message);
-  }
-}
+    return inner.send(email, message);
+  };
 
-export { ThrottledNotificationClient };
+  return { send };
+};
+
+export { createThrottledNotificationClient };

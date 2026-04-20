@@ -4,8 +4,8 @@ import { NotificationPort } from '../../domain/ports/notification-port';
 
 const NOTIFICATION_API_URL = process.env.NOTIFICATION_API_URL || 'http://localhost:3001';
 
-class NotificationClient implements NotificationPort {
-  send(email: string, message: string): Promise<AxiosResponse> {
+const createNotificationClient = (): NotificationPort => {
+  const send = (email: string, message: string): Promise<AxiosResponse> => {
     return axios
       .post(`${NOTIFICATION_API_URL}/api/notify`, { email, message })
       .then((response) => {
@@ -16,7 +16,9 @@ class NotificationClient implements NotificationPort {
         console.error('Failed to send notification', { error: error.message });
         throw error;
       });
-  }
-}
+  };
 
-export { NotificationClient };
+  return { send };
+};
+
+export { createNotificationClient };

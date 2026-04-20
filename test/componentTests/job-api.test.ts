@@ -2,16 +2,16 @@ import request from 'supertest';
 import express from 'express';
 import { createRoutes } from '../../src/api/routes';
 import { errorHandler } from '../../src/api/middleware/error-handler';
-import { InMemoryJobRepository } from '../../src/infrastructure/repositories/in-memory-job-repository';
-import { InMemoryJobApplicationRepository } from '../../src/infrastructure/repositories/in-memory-job-application-repository';
+import { createInMemoryJobRepository } from '../../src/infrastructure/repositories/in-memory-job-repository';
+import { createInMemoryJobApplicationRepository } from '../../src/infrastructure/repositories/in-memory-job-application-repository';
 import { NotificationPort } from '../../src/domain/ports/notification-port';
 
 const createTestApp = () => {
   const app = express();
   app.use(express.json());
 
-  const jobRepository = new InMemoryJobRepository();
-  const applicationRepository = new InMemoryJobApplicationRepository();
+  const jobRepository = createInMemoryJobRepository();
+  const applicationRepository = createInMemoryJobApplicationRepository();
   const notificationPort: NotificationPort = {
     send: jest.fn().mockResolvedValue({ data: {}, status: 200, statusText: 'OK', headers: {}, config: {} }),
   };

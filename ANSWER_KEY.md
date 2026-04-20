@@ -22,7 +22,7 @@
 | L2  | Controller bypasses service, calls repo directly  | `src/api/controllers/job-controller.ts`                   | Clean Arch / Layer   | Medium     |
 | L3  | Domain error extends API `HttpError`              | `src/domain/errors/job-not-found.ts`                      | Clean Arch / Layer   | Easy       |
 | L4  | Application service accepts Express `Request`     | `src/application/services/job-service.ts`                 | Clean Arch / Leak    | Hard       |
-| D1  | Service instantiates concrete `NotificationClient`| `src/application/services/job-application-service.ts`     | Clean Arch / DIP     | Medium     |
+| D1  | Service instantiates concrete notification client | `src/application/services/job-application-service.ts`     | Clean Arch / DIP     | Medium     |
 | D2  | Direct `axios` call from application layer        | `src/application/services/audit-service.ts`               | Clean Arch / DIP     | Hard       |
 | D3  | Domain reads `process.env`                        | `src/domain/models/job.ts`                                | Clean Arch / Config  | Hard       |
 | X1  | `console.log` instead of a `Logger` port          | `src/application/services/job-service.ts`, `src/domain/models/job.ts` | Clean Arch / DIP | Easy |
@@ -30,8 +30,8 @@
 | X3  | Business logic inside repository (and on port)    | `src/infrastructure/repositories/in-memory-job-repository.ts`, `src/domain/ports/job-repository.ts` | Clean Arch / SRP | Medium |
 | O1  | Switch-on-platform in formatter                   | `src/application/formatters/job-formatter.ts`             | SOLID / OCP          | Easy       |
 | O2  | Growing `instanceof` chain in error handler       | `src/api/middleware/error-handler.ts`                     | SOLID / OCP          | Medium     |
-| Li1 | `ThrottledNotificationClient` breaks base contract| `src/infrastructure/external/throttled-notification-client.ts` | SOLID / LSP     | Hard       |
-| Li2 | `ReadOnlyJobRepository` throws on `save/update/remove`| `src/infrastructure/repositories/read-only-job-repository.ts` | SOLID / LSP | Medium  |
+| Li1 | Throttled notification client breaks port contract| `src/infrastructure/external/throttled-notification-client.ts` | SOLID / LSP     | Hard       |
+| Li2 | Read-only job repository throws on `save/update/remove`| `src/infrastructure/repositories/read-only-job-repository.ts` | SOLID / LSP | Medium  |
 | I1  | Fat `JobRepository` port (persistence + reporting + notify) | `src/domain/ports/job-repository.ts`            | SOLID / ISP          | Medium     |
 | I2  | Fat `JobApplicationRepository` port (CRUD + lifecycle + export) | `src/domain/ports/job-application-repository.ts` | SOLID / ISP  | Medium     |
 | D4  | Missing `Clock` port; `new Date()` scattered      | `src/domain/models/job.ts`, `src/application/services/job-application-service.ts`, `src/application/services/audit-service.ts` | Clean Arch / DIP | Medium |
@@ -280,20 +280,20 @@ const searchJobs = async (filters: JobSearchFilters): Promise<Job[]> => { ... };
 
 ---
 
-### Violation D1 — Service instantiates concrete `NotificationClient`
+### Violation D1 — Service instantiates concrete notification client
 
 **File**: `src/application/services/job-application-service.ts`
 **Lines**:
 
 ```typescript
-import { NotificationClient } from '../../infrastructure/external/notification-client';
+import { createNotificationClient } from '../../infrastructure/external/notification-client';
 ...
-const legacyNotifier = new NotificationClient();
+const legacyNotifier = createNotificationClient();
 ...
 await legacyNotifier.send(params.applicantEmail, message);
 ```
 
-**Principle**: Dependency Inversion — the service already receives a `NotificationPort`. Constructing a concrete infrastructure class inside the service re-couples the application layer to infrastructure and bypasses the port.
+**Principle**: Dependency Inversion — the service already receives a `NotificationPort`. Constructing a concrete infrastructure adapter inside the service re-couples the application layer to infrastructure and bypasses the port.
 **Fix**: Remove the import and the `legacyNotifier`; use only the injected `notificationPort`. Wire the concrete client at the composition root (`src/app.ts`) as usual.
 
 ---
@@ -422,30 +422,31 @@ handlers.set(HttpError, (e, r) => r.status((e as HttpError).statusCode).json(...
 
 ---
 
-### Violation Li1 — `ThrottledNotificationClient` breaks base contract (LSP)
+### Violation Li1 — `createThrottledNotificationClient` breaks port contract (LSP)
 
 **File**: `src/infrastructure/external/throttled-notification-client.ts`
-**Smell**: Subclass `extends NotificationClient` and overrides `send` to silently return a fake `AxiosResponse` (`status: 429`) **without calling axios** once a throttle counter trips — violating the base contract ("sent, or error").
-**Principle**: Subtypes must be substitutable for their base type.
-**Fix**: Use composition (decorator) instead of inheritance, or have the subclass honour the contract by throwing `ThrottledError`:
+**Smell**: The factory composes an inner `NotificationPort` but, once the throttle counter trips, returns a fake `AxiosResponse` (`status: 429`) **without calling the inner client** — violating the port contract ("sent, or error"). Consumers that hold a `NotificationPort` cannot rely on a successful return meaning "delivered".
+**Principle**: Subtypes (and decorators) must be substitutable for the port they implement.
+**Fix**: Honour the contract by throwing a domain-specific error when throttled:
 
 ```typescript
-class ThrottlingNotifier implements NotificationPort {
-  constructor(private readonly inner: NotificationPort) {}
-  async send(email: string, msg: string) {
-    if (this.isThrottled()) throw new ThrottledError();
-    return this.inner.send(email, msg);
-  }
-}
+const createThrottlingNotifier = (inner: NotificationPort): NotificationPort => {
+  return {
+    send: async (email, msg) => {
+      if (isThrottled()) throw new ThrottledError();
+      return inner.send(email, msg);
+    },
+  };
+};
 ```
 
 ---
 
-### Violation Li2 — `ReadOnlyJobRepository` throws on writes (LSP)
+### Violation Li2 — `createReadOnlyJobRepository` throws on writes (LSP)
 
 **File**: `src/infrastructure/repositories/read-only-job-repository.ts`
-**Smell**: `extends InMemoryJobRepository` but overrides `save`, `update`, `remove`, `saveFromRequest` to `throw new Error('Read-only mode: ...')`. Any caller holding a `JobRepository` reference cannot substitute this subtype safely.
-**Fix**: Don't model read-only-ness via a broken subclass. Introduce a narrower `JobReadRepository` port and make `JobRepository` *extend* it for full access. Callers that only need reads depend on the narrower type.
+**Smell**: Spreads an inner `InMemoryJobRepository` and overrides `save`, `update`, `remove`, `saveFromRequest` to `throw new Error('Read-only mode: ...')`. The returned object structurally satisfies `JobRepository`, so any caller holding that port reference cannot substitute this factory's output safely.
+**Fix**: Don't model read-only-ness as a repo that pretends to satisfy the full port. Introduce a narrower `JobReadRepository` port and make `JobRepository` *extend* it for full access. Callers that only need reads depend on the narrower type.
 
 ---
 
