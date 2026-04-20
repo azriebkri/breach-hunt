@@ -1,4 +1,4 @@
-import { Job } from '../job';
+import type { Job } from "../job.js";
 
 interface JobRepository {
   findAll(): Promise<Job[]>;
@@ -6,7 +6,7 @@ interface JobRepository {
   save(job: Job): Promise<Job>;
   update(
     id: string,
-    updates: Partial<Omit<Job, 'id' | 'postedAt'>>,
+    updates: Partial<Omit<Job, "id" | "postedAt">>,
   ): Promise<Job | undefined>;
   remove(id: string): Promise<boolean>;
   findActiveHighPayingJobs(): Promise<Job[]>;
@@ -15,4 +15,4 @@ interface JobRepository {
   getAverageSalary(): Promise<number>;
 }
 
-export { JobRepository };
+export type { JobRepository };

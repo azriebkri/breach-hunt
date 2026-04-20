@@ -1,13 +1,21 @@
-class SalaryLimitExceededError extends Error {
-  public readonly salary: number;
-  public readonly max: number;
+type SalaryLimitExceededError = Error & {
+  salary: number;
+  max: number;
+};
 
-  constructor(salary: number, max: number) {
-    super(`Salary ${salary} exceeds configured maximum ${max}`);
-    this.name = 'SalaryLimitExceededError';
-    this.salary = salary;
-    this.max = max;
-  }
-}
+const createSalaryLimitExceededError = (
+  salary: number,
+  max: number,
+): SalaryLimitExceededError => {
+  const base = new Error(`Salary ${salary} exceeds configured maximum ${max}`);
+  base.name = 'SalaryLimitExceededError';
+  return Object.assign(base, { salary, max });
+};
 
-export { SalaryLimitExceededError };
+const isSalaryLimitExceededError = (
+  err: unknown,
+): err is SalaryLimitExceededError =>
+  err instanceof Error && err.name === 'SalaryLimitExceededError';
+
+export type { SalaryLimitExceededError };
+export { createSalaryLimitExceededError, isSalaryLimitExceededError };

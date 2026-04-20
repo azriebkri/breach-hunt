@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import { CreateApplicationRequest } from './jobApplicationSchemas';
+import { createApplicationSchema } from './jobApplicationSchemas';
 import { createApplyToJobInteractor } from '../../usecases/applyToJob/applyToJobInteractor';
 import type { ControllerDependencies } from '../contextState';
 
 const createApplyToJobController = (deps: ControllerDependencies) => {
   const interactor = createApplyToJobInteractor(
     deps.applicationRepository,
-    deps.notificationPort,
+    deps.notificationGateway,
     deps.jobRepository,
   );
 
@@ -16,7 +16,7 @@ const createApplyToJobController = (deps: ControllerDependencies) => {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const body = req.body as CreateApplicationRequest;
+      const body = createApplicationSchema.parse(req.body);
       const application = await interactor.applyToJob(req.params.id, body);
       res.status(201).json(application);
     } catch (error) {

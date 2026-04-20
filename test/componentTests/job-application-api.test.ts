@@ -4,7 +4,7 @@ import { createRouter } from '../../src/application/router';
 import { errorHandler } from '../../src/application/middleware/errorHandlerMiddleware';
 import { createInMemoryJobRepository } from '../../src/infrastructure/jobs/inMemoryJobRepository';
 import { createInMemoryJobApplicationRepository } from '../../src/infrastructure/jobApplications/inMemoryJobApplicationRepository';
-import { NotificationPort } from '../../src/entities/ports/notificationPort';
+import { NotificationGateway } from '../../src/entities/gateways/notificationGateway';
 
 const createTestApp = () => {
   const app = express();
@@ -12,11 +12,11 @@ const createTestApp = () => {
 
   const jobRepository = createInMemoryJobRepository();
   const applicationRepository = createInMemoryJobApplicationRepository();
-  const notificationPort: NotificationPort = {
+  const notificationGateway: NotificationGateway = {
     send: jest.fn().mockResolvedValue({ data: {}, status: 200, statusText: 'OK', headers: {}, config: {} }),
   };
 
-  const routes = createRouter({ jobRepository, applicationRepository, notificationPort });
+  const routes = createRouter({ jobRepository, applicationRepository, notificationGateway });
   app.use('/api', routes);
   app.use(errorHandler);
 

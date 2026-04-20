@@ -1,5 +1,5 @@
-import { JobRepository } from '../../entities/ports/jobRepository';
-import { HttpError } from '../../application/middleware/errorHandlerMiddleware';
+import { JobRepository } from '../../entities/gateways/jobRepository';
+import { createHttpError } from '../../application/middleware/errorHandlerMiddleware';
 import { auditJobEvent } from '../auditJobEvent/auditJobEventInteractor';
 
 const createDeleteJobInteractor = (jobRepository: JobRepository) => {
@@ -7,7 +7,7 @@ const createDeleteJobInteractor = (jobRepository: JobRepository) => {
     const removed = await jobRepository.remove(id);
 
     if (!removed) {
-      throw new HttpError(404, 'Job not found');
+      throw createHttpError(404, 'Job not found');
     }
 
     auditJobEvent('job.removed', { jobId: id }).catch(() => {

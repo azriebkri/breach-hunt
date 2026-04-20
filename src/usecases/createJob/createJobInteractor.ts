@@ -1,7 +1,7 @@
-import { Job, createJob } from '../../entities/job';
-import { JobRepository } from '../../entities/ports/jobRepository';
-import { createJobSchema } from '../../application/jobs/jobSchemas';
-import { auditJobEvent } from '../auditJobEvent/auditJobEventInteractor';
+import { createJobSchema } from "../../application/jobs/jobSchemas.js";
+import type { JobRepository } from "../../entities/gateways/jobRepository.js";
+import { type Job, createJob } from "../../entities/job.js";
+import { auditJobEvent } from "../auditJobEvent/auditJobEventInteractor.js";
 
 interface CreateJobParams {
   title: string;
@@ -24,13 +24,13 @@ const createCreateJobInteractor = (jobRepository: JobRepository) => {
     );
     const saved = await jobRepository.save(job);
 
-    console.log('job created', {
-      activity: 'jobCreated',
+    console.log("job created", {
+      activity: "jobCreated",
       jobId: saved.id,
       company: saved.company,
     });
 
-    auditJobEvent('job.created', {
+    auditJobEvent("job.created", {
       jobId: saved.id,
       company: saved.company,
     }).catch(() => {
@@ -43,4 +43,4 @@ const createCreateJobInteractor = (jobRepository: JobRepository) => {
   return { addJob };
 };
 
-export { createCreateJobInteractor, CreateJobParams };
+export { createCreateJobInteractor, type CreateJobParams };

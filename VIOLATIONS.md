@@ -16,7 +16,7 @@ per scope decision, so they are not listed here.
 | #3  | Dependency Rule   | `src/usecases/getJob/getJobInteractor.ts`                                    | 3, 10             | `import { HttpError } from '../../application/middleware/errorHandlerMiddleware'`; usecase `throw new HttpError(404, ...)`. |
 | #3  | Dependency Rule   | `src/usecases/updateJob/updateJobInteractor.ts`                              | 3, 14             | Same pattern — HTTP error thrown from usecase.                                          |
 | #3  | Dependency Rule   | `src/usecases/deleteJob/deleteJobInteractor.ts`                              | 2, 10             | Same pattern — HTTP error thrown from usecase.                                          |
-| #9  | Dependency Rule   | `src/entities/ports/notificationPort.ts`                                     | 1, 4              | `import { AxiosResponse } from 'axios'` in domain port; port returns `Promise<AxiosResponse>`. |
+| #9  | Dependency Rule   | `src/entities/gateways/notificationGateway.ts`                               | 1, 4              | `import { AxiosResponse } from 'axios'` in domain gateway; gateway returns `Promise<AxiosResponse>`. |
 | L1  | Dependency Rule   | `src/infrastructure/jobs/inMemoryJobRepository.ts`                           | 4, 8, 23–38       | Infra imports API-layer schema `CreateJobRequest`; `saveFromRequest()` consumes it.     |
 | L2  | Dependency Rule   | `src/application/jobs/getJobsByCompanyController.ts`                         | 12                | Controller calls `deps.jobRepository.findAll()` directly instead of a use case.         |
 | L2  | Dependency Rule   | `src/application/jobs/getFeaturedJobsController.ts`                          | 11                | Controller calls `deps.jobRepository.findActiveHighPayingJobs()` directly.              |
@@ -29,13 +29,13 @@ per scope decision, so they are not listed here.
 | ID  | Principle | File                                                         | Line(s)          | Detail                                                                                                     |
 | --- | --------- | ------------------------------------------------------------ | ---------------- | ---------------------------------------------------------------------------------------------------------- |
 | #5  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`            | 4, 18            | Usecase parameter typed as concrete `InMemoryJobRepository` instead of the port.                           |
-| D1  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`            | 5, 20            | Usecase instantiates `createNotificationClient()` even though `notificationPort` is already injected.      |
+| D1  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`            | 5, 20            | Usecase instantiates `createNotificationClient()` even though `notificationGateway` is already injected.   |
 | D2  | DIP       | `src/usecases/auditJobEvent/auditJobEventInteractor.ts`      | 1, 10            | Usecase imports `axios` and calls `axios.post(AUDIT_URL, ...)` directly (no gateway).                      |
-| X1  | DIP       | `src/entities/job.ts`                                        | 38               | Domain uses `console.log(...)` instead of a `LoggerPort`.                                                  |
-| X1  | DIP       | `src/usecases/createJob/createJobInteractor.ts`              | 27               | Usecase uses `console.log(...)` instead of a `LoggerPort`.                                                 |
-| D4  | DIP       | `src/entities/job.ts`                                        | 35               | `postedAt: new Date()` — no `Clock` port.                                                                  |
-| D4  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`            | 38               | `appliedAt: new Date()` — no `Clock` port.                                                                 |
-| D4  | DIP       | `src/usecases/auditJobEvent/auditJobEventInteractor.ts`      | 13               | `at: new Date().toISOString()` — no `Clock` port.                                                          |
+| X1  | DIP       | `src/entities/job.ts`                                        | 38               | Domain uses `console.log(...)` instead of a `LoggerGateway`.                                               |
+| X1  | DIP       | `src/usecases/createJob/createJobInteractor.ts`              | 27               | Usecase uses `console.log(...)` instead of a `LoggerGateway`.                                              |
+| D4  | DIP       | `src/entities/job.ts`                                        | 35               | `postedAt: new Date()` — no `Clock` gateway.                                                               |
+| D4  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`            | 38               | `appliedAt: new Date()` — no `Clock` gateway.                                                              |
+| D4  | DIP       | `src/usecases/auditJobEvent/auditJobEventInteractor.ts`      | 13               | `at: new Date().toISOString()` — no `Clock` gateway.                                                       |
 | D5  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`            | 49, 51           | Usecase reads `process.env.NOTIFICATION_ENABLED` and `process.env.NOTIFICATION_RETRIES`.                   |
 
 ## Clean Architecture — Leak / Config
@@ -50,7 +50,7 @@ per scope decision, so they are not listed here.
 | ID  | Principle | File                                                 | Line(s)     | Detail                                                                                      |
 | --- | --------- | ---------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------- |
 | #4  | SRP       | `src/application/jobs/listJobsController.ts`         | 19–25       | Controller holds business logic (`.filter(...).filter(...).sort(...)`) instead of delegating to the use case. |
-| X3  | SRP       | `src/entities/ports/jobRepository.ts`                | 12          | Business rule `findActiveHighPayingJobs()` exposed on the port.                             |
+| X3  | SRP       | `src/entities/gateways/jobRepository.ts`             | 12          | Business rule `findActiveHighPayingJobs()` exposed on the gateway.                          |
 | X3  | SRP       | `src/infrastructure/jobs/inMemoryJobRepository.ts`   | 40–45       | Repo encodes `salary > HIGH_SALARY_THRESHOLD` filter + sort.                                |
 
 ## SOLID — OCP (Open/Closed)
@@ -71,8 +71,8 @@ per scope decision, so they are not listed here.
 
 | ID  | Principle | File                                                  | Line(s)    | Detail                                                                                     |
 | --- | --------- | ----------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------ |
-| I1  | ISP       | `src/entities/ports/jobRepository.ts`                 | 3–16       | Fat port: CRUD + `findActiveHighPayingJobs` + `getTotalJobsPosted` + `sendWeeklyReport` + `getAverageSalary` on a single interface (lines 12–15 are the extra roles). |
-| I2  | ISP       | `src/entities/ports/jobApplicationRepository.ts`      | 3–13       | Fat port: CRUD + `archiveOldApplications` + `sendFollowUp` + `exportToCsv` + `getApplicantMetrics` on a single interface (lines 6–12 are the extra roles). |
+| I1  | ISP       | `src/entities/gateways/jobRepository.ts`              | 3–16       | Fat gateway: CRUD + `findActiveHighPayingJobs` + `getTotalJobsPosted` + `sendWeeklyReport` + `getAverageSalary` on a single interface (lines 12–15 are the extra roles). |
+| I2  | ISP       | `src/entities/gateways/jobApplicationRepository.ts`   | 3–13       | Fat gateway: CRUD + `archiveOldApplications` + `sendFollowUp` + `exportToCsv` + `getApplicantMetrics` on a single interface (lines 6–12 are the extra roles). |
 
 ## DDD
 

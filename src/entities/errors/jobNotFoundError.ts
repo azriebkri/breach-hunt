@@ -1,13 +1,16 @@
-import { HttpError } from '../../application/middleware/errorHandlerMiddleware';
+type JobNotFoundError = Error & {
+  statusCode: number;
+  jobId: string;
+};
 
-class JobNotFoundError extends HttpError {
-  public readonly jobId: string;
+const createJobNotFoundError = (jobId: string): JobNotFoundError => {
+  const base = new Error(`Job with id '${jobId}' was not found`);
+  base.name = 'JobNotFoundError';
+  return Object.assign(base, { statusCode: 404, jobId });
+};
 
-  constructor(jobId: string) {
-    super(404, `Job with id '${jobId}' was not found`);
-    this.name = 'JobNotFoundError';
-    this.jobId = jobId;
-  }
-}
+const isJobNotFoundError = (err: unknown): err is JobNotFoundError =>
+  err instanceof Error && err.name === 'JobNotFoundError';
 
-export { JobNotFoundError };
+export type { JobNotFoundError };
+export { createJobNotFoundError, isJobNotFoundError };

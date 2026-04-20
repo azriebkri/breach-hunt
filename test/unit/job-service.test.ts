@@ -4,9 +4,8 @@ import { createGetJobInteractor } from '../../src/usecases/getJob/getJobInteract
 import { createSearchJobsInteractor } from '../../src/usecases/searchJobs/searchJobsInteractor';
 import { createUpdateJobInteractor } from '../../src/usecases/updateJob/updateJobInteractor';
 import { createDeleteJobInteractor } from '../../src/usecases/deleteJob/deleteJobInteractor';
-import { JobRepository } from '../../src/entities/ports/jobRepository';
+import { JobRepository } from '../../src/entities/gateways/jobRepository';
 import { Job } from '../../src/entities/job';
-import { HttpError } from '../../src/application/middleware/errorHandlerMiddleware';
 
 const mockJob: Job = {
   id: 'job-1',
@@ -64,7 +63,10 @@ describe('Job interactors', () => {
 
       const { getJobById } = createGetJobInteractor(mockJobRepository);
 
-      await expect(getJobById('missing-id')).rejects.toThrow(HttpError);
+      await expect(getJobById('missing-id')).rejects.toMatchObject({
+        name: 'HttpError',
+        statusCode: 404,
+      });
     });
   });
 
@@ -147,9 +149,10 @@ describe('Job interactors', () => {
 
       const { updateJob } = createUpdateJobInteractor(mockJobRepository);
 
-      await expect(updateJob('missing', { title: 'x' })).rejects.toThrow(
-        HttpError,
-      );
+      await expect(updateJob('missing', { title: 'x' })).rejects.toMatchObject({
+        name: 'HttpError',
+        statusCode: 404,
+      });
     });
   });
 
@@ -168,7 +171,10 @@ describe('Job interactors', () => {
 
       const { removeJob } = createDeleteJobInteractor(mockJobRepository);
 
-      await expect(removeJob('missing')).rejects.toThrow(HttpError);
+      await expect(removeJob('missing')).rejects.toMatchObject({
+        name: 'HttpError',
+        statusCode: 404,
+      });
     });
   });
 });

@@ -1,13 +1,13 @@
 import { AxiosResponse } from 'axios';
-import { NotificationPort } from '../../entities/ports/notificationPort';
+import { NotificationGateway } from '../../entities/gateways/notificationGateway';
 import { createNotificationClient } from './notificationClient';
 
 const THROTTLE_LIMIT = 10;
 const WINDOW_MS = 1000;
 
 const createThrottledNotificationClient = (
-  inner: NotificationPort = createNotificationClient(),
-): NotificationPort => {
+  inner: NotificationGateway = createNotificationClient(),
+): NotificationGateway => {
   let sendCount = 0;
   let windowStart = Date.now();
 

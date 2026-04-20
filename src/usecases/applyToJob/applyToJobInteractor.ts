@@ -1,10 +1,10 @@
 import { JobApplication } from '../../entities/jobApplication';
-import { JobApplicationRepository } from '../../entities/ports/jobApplicationRepository';
-import { NotificationPort } from '../../entities/ports/notificationPort';
+import { JobApplicationRepository } from '../../entities/gateways/jobApplicationRepository';
+import { NotificationGateway } from '../../entities/gateways/notificationGateway';
 import { InMemoryJobRepository } from '../../infrastructure/jobs/inMemoryJobRepository';
 import { createNotificationClient } from '../../infrastructure/notifications/notificationClient';
 import { generateId } from '../../infrastructure/utils/idGenerator';
-import { ApplicationFailedError } from '../../entities/errors/applicationFailedError';
+import { createApplicationFailedError } from '../../entities/errors/applicationFailedError';
 
 interface CreateApplicationParams {
   applicantName: string;
@@ -14,7 +14,7 @@ interface CreateApplicationParams {
 
 const createApplyToJobInteractor = (
   applicationRepository: JobApplicationRepository,
-  notificationPort: NotificationPort,
+  notificationGateway: NotificationGateway,
   jobRepository: InMemoryJobRepository,
 ) => {
   const legacyNotifier = createNotificationClient();
@@ -26,7 +26,7 @@ const createApplyToJobInteractor = (
     const job = await jobRepository.findById(jobId);
 
     if (!job) {
-      throw new ApplicationFailedError(jobId, 'The job posting does not exist');
+      throw createApplicationFailedError(jobId, 'The job posting does not exist');
     }
 
     const application: JobApplication = {
@@ -44,7 +44,9 @@ const createApplyToJobInteractor = (
 
     try {
       await legacyNotifier.send(params.applicantEmail, message);
-    } catch (_err) {}
+    } catch (_err) {
+      // legacy notifier is best-effort; failures are intentionally ignored
+    }
 
     const notificationsEnabled = process.env.NOTIFICATION_ENABLED !== 'false';
     const notificationRetries = Number(
@@ -55,7 +57,7 @@ const createApplyToJobInteractor = (
       let attempt = 0;
       while (attempt < notificationRetries) {
         try {
-          await notificationPort.send(params.applicantEmail, message);
+          await notificationGateway.send(params.applicantEmail, message);
           break;
         } catch (_err) {
           attempt += 1;

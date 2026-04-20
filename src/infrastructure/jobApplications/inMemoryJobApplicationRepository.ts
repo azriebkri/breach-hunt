@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { JobApplication } from '../../entities/jobApplication';
-import { JobApplicationRepository } from '../../entities/ports/jobApplicationRepository';
+import { JobApplicationRepository } from '../../entities/gateways/jobApplicationRepository';
 import { FOLLOW_UP_URL } from '../../constants';
 
 const createInMemoryJobApplicationRepository = (): JobApplicationRepository => {

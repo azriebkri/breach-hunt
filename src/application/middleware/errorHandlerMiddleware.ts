@@ -1,16 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
-import { ApplicationFailedError } from '../../entities/errors/applicationFailedError';
-import { SalaryLimitExceededError } from '../../entities/errors/salaryLimitExceededError';
+import { isApplicationFailedError } from '../../entities/errors/applicationFailedError';
+import { isSalaryLimitExceededError } from '../../entities/errors/salaryLimitExceededError';
 
-class HttpError extends Error {
-  public readonly statusCode: number;
+type HttpError = Error & { statusCode: number };
 
-  constructor(statusCode: number, message: string) {
-    super(message);
-    this.name = 'HttpError';
-    this.statusCode = statusCode;
-  }
-}
+const createHttpError = (statusCode: number, message: string): HttpError => {
+  const base = new Error(message);
+  base.name = 'HttpError';
+  return Object.assign(base, { statusCode });
+};
+
+const isHttpError = (err: unknown): err is HttpError => {
+  if (!(err instanceof Error)) return false;
+  if (!('statusCode' in err)) return false;
+  return typeof err.statusCode === 'number';
+};
 
 const errorHandler = (
   err: Error,
@@ -18,17 +22,17 @@ const errorHandler = (
   res: Response,
   _next: NextFunction,
 ): void => {
-  if (err instanceof HttpError) {
+  if (isHttpError(err)) {
     res.status(err.statusCode).json({ error: err.message });
     return;
   }
 
-  if (err instanceof ApplicationFailedError) {
+  if (isApplicationFailedError(err)) {
     res.status(400).json({ error: err.message });
     return;
   }
 
-  if (err instanceof SalaryLimitExceededError) {
+  if (isSalaryLimitExceededError(err)) {
     res.status(422).json({
       error: err.message,
       salary: err.salary,
@@ -56,4 +60,5 @@ const errorHandler = (
   res.status(500).json({ error: 'Internal server error' });
 };
 
-export { HttpError, errorHandler };
+export type { HttpError };
+export { createHttpError, isHttpError, errorHandler };

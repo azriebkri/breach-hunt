@@ -1,9 +1,8 @@
 import { createApplyToJobInteractor } from '../../src/usecases/applyToJob/applyToJobInteractor';
 import { createGetApplicationsForJobInteractor } from '../../src/usecases/getApplicationsForJob/getApplicationsForJobInteractor';
-import { JobApplicationRepository } from '../../src/entities/ports/jobApplicationRepository';
-import { NotificationPort } from '../../src/entities/ports/notificationPort';
+import { JobApplicationRepository } from '../../src/entities/gateways/jobApplicationRepository';
+import { NotificationGateway } from '../../src/entities/gateways/notificationGateway';
 import { JobApplication } from '../../src/entities/jobApplication';
-import { ApplicationFailedError } from '../../src/entities/errors/applicationFailedError';
 import { InMemoryJobRepository } from '../../src/infrastructure/jobs/inMemoryJobRepository';
 
 const mockApplicationRepository: jest.Mocked<JobApplicationRepository> = {
@@ -15,7 +14,7 @@ const mockApplicationRepository: jest.Mocked<JobApplicationRepository> = {
   getApplicantMetrics: jest.fn(),
 };
 
-const mockNotificationPort: jest.Mocked<NotificationPort> = {
+const mockNotificationGateway: jest.Mocked<NotificationGateway> = {
   send: jest.fn(),
 };
 
@@ -46,7 +45,7 @@ describe('JobApplication interactors', () => {
 
       mockJobRepository.findById.mockResolvedValue(mockJob);
       mockApplicationRepository.save.mockImplementation(async (app) => app);
-      mockNotificationPort.send.mockResolvedValue({
+      mockNotificationGateway.send.mockResolvedValue({
         data: {},
         status: 200,
         statusText: 'OK',
@@ -56,7 +55,7 @@ describe('JobApplication interactors', () => {
 
       const { applyToJob } = createApplyToJobInteractor(
         mockApplicationRepository,
-        mockNotificationPort,
+        mockNotificationGateway,
         mockJobRepository,
       );
 
@@ -70,7 +69,7 @@ describe('JobApplication interactors', () => {
       expect(result.applicantName).toBe('Jane Doe');
       expect(result.applicantEmail).toBe('jane@example.com');
       expect(mockApplicationRepository.save).toHaveBeenCalledTimes(1);
-      expect(mockNotificationPort.send).toHaveBeenCalledWith(
+      expect(mockNotificationGateway.send).toHaveBeenCalledWith(
         'jane@example.com',
         expect.stringContaining('Software Engineer'),
       );
@@ -81,7 +80,7 @@ describe('JobApplication interactors', () => {
 
       const { applyToJob } = createApplyToJobInteractor(
         mockApplicationRepository,
-        mockNotificationPort,
+        mockNotificationGateway,
         mockJobRepository,
       );
 
@@ -91,7 +90,7 @@ describe('JobApplication interactors', () => {
           applicantEmail: 'jane@example.com',
           coverLetter: 'Hello',
         }),
-      ).rejects.toThrow(ApplicationFailedError);
+      ).rejects.toMatchObject({ name: 'ApplicationFailedError' });
     });
   });
 

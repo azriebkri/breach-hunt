@@ -1,5 +1,5 @@
 import { JobApplication } from '../../entities/jobApplication';
-import { JobApplicationRepository } from '../../entities/ports/jobApplicationRepository';
+import { JobApplicationRepository } from '../../entities/gateways/jobApplicationRepository';
 
 const createGetApplicationsForJobInteractor = (
   applicationRepository: JobApplicationRepository,

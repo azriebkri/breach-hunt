@@ -13,8 +13,7 @@ const mockJob: Job = {
 
 describe('formatJobForPlatform', () => {
   it('should format a job for the seek platform', () => {
-    const formatter = formatJobForPlatform(mockJob);
-    const result = formatter('seek');
+    const result = formatJobForPlatform('seek', mockJob);
 
     expect(result.id).toBe('job-1');
     expect(result.title).toBe('Software Engineer');
@@ -25,16 +24,14 @@ describe('formatJobForPlatform', () => {
   });
 
   it('should format a job for a non-seek platform', () => {
-    const formatter = formatJobForPlatform(mockJob);
-    const result = formatter('indeed');
+    const result = formatJobForPlatform('indeed', mockJob);
 
     expect(result.salary).toBe('140,000 AUD');
     expect(result.platform).toBe('indeed');
   });
 
   it('should include location in the formatted output', () => {
-    const formatter = formatJobForPlatform(mockJob);
-    const result = formatter('seek');
+    const result = formatJobForPlatform('seek', mockJob);
 
     expect(result.location).toBe('Melbourne');
   });

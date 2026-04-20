@@ -1,5 +1,5 @@
 import { Job } from '../../entities/job';
-import { JobRepository } from '../../entities/ports/jobRepository';
+import { JobRepository } from '../../entities/gateways/jobRepository';
 
 const createGetJobsByCompanyInteractor = (jobRepository: JobRepository) => {
   const getJobsByCompany = async (company: string): Promise<Job[]> => {

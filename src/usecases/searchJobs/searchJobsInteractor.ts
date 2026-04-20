@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import { Job } from '../../entities/job';
-import { JobRepository } from '../../entities/ports/jobRepository';
+import { JobRepository } from '../../entities/gateways/jobRepository';
 
 interface JobSearchFilters {
   location?: string;

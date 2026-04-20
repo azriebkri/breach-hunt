@@ -1,11 +1,11 @@
-import type { JobApplicationRepository } from '../entities/ports/jobApplicationRepository';
-import type { NotificationPort } from '../entities/ports/notificationPort';
-import type { InMemoryJobRepository } from '../infrastructure/jobs/inMemoryJobRepository';
+import type { JobApplicationRepository } from "../entities/gateways/jobApplicationRepository.js";
+import type { NotificationGateway } from "../entities/gateways/notificationGateway.js";
+import type { InMemoryJobRepository } from "../infrastructure/jobs/inMemoryJobRepository.js";
 
 interface ControllerDependencies {
   readonly jobRepository: InMemoryJobRepository;
   readonly applicationRepository: JobApplicationRepository;
-  readonly notificationPort: NotificationPort;
+  readonly notificationGateway: NotificationGateway;
 }
 
-export { ControllerDependencies };
+export type { ControllerDependencies };

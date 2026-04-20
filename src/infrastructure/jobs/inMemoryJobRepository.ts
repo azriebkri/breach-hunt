@@ -1,8 +1,9 @@
-import axios from 'axios';
-import { Job } from '../../entities/job';
-import { JobRepository } from '../../entities/ports/jobRepository';
-import { CreateJobRequest } from '../../application/jobs/jobSchemas';
-import { HIGH_SALARY_THRESHOLD, WEEKLY_REPORT_URL } from '../../constants';
+import axios from "axios";
+
+import type { CreateJobRequest } from "../../application/jobs/jobSchemas.js";
+import { HIGH_SALARY_THRESHOLD, WEEKLY_REPORT_URL } from "../../constants.js";
+import type { JobRepository } from "../../entities/gateways/jobRepository.js";
+import type { Job } from "../../entities/job.js";
 
 interface InMemoryJobRepositoryApi extends JobRepository {
   saveFromRequest(id: string, request: CreateJobRequest): Promise<Job>;
@@ -11,7 +12,7 @@ interface InMemoryJobRepositoryApi extends JobRepository {
 const createInMemoryJobRepository = (): InMemoryJobRepositoryApi => {
   const jobs = new Map<string, Job>();
 
-  const findAll = async (): Promise<Job[]> => Array.from(jobs.values());
+  const findAll = (): Job[] => Array.from(jobs.values());
 
   const findById = async (id: string): Promise<Job | undefined> => jobs.get(id);
 
@@ -50,7 +51,7 @@ const createInMemoryJobRepository = (): InMemoryJobRepositoryApi => {
     const total = jobs.size;
     const summary = Array.from(jobs.values())
       .map((job) => `${job.title} @ ${job.company}`)
-      .join('\n');
+      .join("\n");
     await axios.post(WEEKLY_REPORT_URL, {
       to: email,
       body: `Total jobs: ${total}\n\n${summary}`,
@@ -59,14 +60,16 @@ const createInMemoryJobRepository = (): InMemoryJobRepositoryApi => {
 
   const getAverageSalary = async (): Promise<number> => {
     const all = Array.from(jobs.values());
-    if (all.length === 0) return 0;
+    if (all.length === 0) {
+      return 0;
+    }
     const total = all.reduce((sum, job) => sum + job.salary, 0);
     return total / all.length;
   };
 
   const update = async (
     id: string,
-    updates: Partial<Omit<Job, 'id' | 'postedAt'>>,
+    updates: Partial<Omit<Job, "id" | "postedAt">>,
   ): Promise<Job | undefined> => {
     const existing = jobs.get(id);
 
@@ -97,4 +100,4 @@ const createInMemoryJobRepository = (): InMemoryJobRepositoryApi => {
 
 type InMemoryJobRepository = ReturnType<typeof createInMemoryJobRepository>;
 
-export { createInMemoryJobRepository, InMemoryJobRepository };
+export { createInMemoryJobRepository, type InMemoryJobRepository };

@@ -1,13 +1,21 @@
-class ApplicationFailedError extends Error {
-  public readonly jobId: string;
-  public readonly reason: string;
+type ApplicationFailedError = Error & {
+  jobId: string;
+  reason: string;
+};
 
-  constructor(jobId: string, reason: string) {
-    super(`Application to job '${jobId}' failed: ${reason}`);
-    this.name = 'ApplicationFailedError';
-    this.jobId = jobId;
-    this.reason = reason;
-  }
-}
+const createApplicationFailedError = (
+  jobId: string,
+  reason: string,
+): ApplicationFailedError => {
+  const base = new Error(`Application to job '${jobId}' failed: ${reason}`);
+  base.name = 'ApplicationFailedError';
+  return Object.assign(base, { jobId, reason });
+};
 
-export { ApplicationFailedError };
+const isApplicationFailedError = (
+  err: unknown,
+): err is ApplicationFailedError =>
+  err instanceof Error && err.name === 'ApplicationFailedError';
+
+export type { ApplicationFailedError };
+export { createApplicationFailedError, isApplicationFailedError };
