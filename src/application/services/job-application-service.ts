@@ -41,11 +41,22 @@ const createJobApplicationService = (
 
     try {
       await legacyNotifier.send(params.applicantEmail, message);
-    } catch (_err) {
-      // legacy notifier failures are tolerated for backwards compatibility
-    }
+    } catch (_err) {}
 
-    await notificationPort.send(params.applicantEmail, message);
+    const notificationsEnabled = process.env.NOTIFICATION_ENABLED !== 'false';
+    const notificationRetries = Number(process.env.NOTIFICATION_RETRIES ?? '1');
+
+    if (notificationsEnabled) {
+      let attempt = 0;
+      while (attempt < notificationRetries) {
+        try {
+          await notificationPort.send(params.applicantEmail, message);
+          break;
+        } catch (_err) {
+          attempt += 1;
+        }
+      }
+    }
 
     return saved;
   };

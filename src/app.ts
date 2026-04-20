@@ -3,7 +3,7 @@ import { createRoutes } from './api/routes';
 import { errorHandler } from './api/middleware/error-handler';
 import { InMemoryJobRepository } from './infrastructure/repositories/in-memory-job-repository';
 import { InMemoryJobApplicationRepository } from './infrastructure/repositories/in-memory-job-application-repository';
-import { NotificationClient } from './infrastructure/external/notification-client';
+import { ThrottledNotificationClient } from './infrastructure/external/throttled-notification-client';
 
 const createApp = () => {
   const app = express();
@@ -12,7 +12,7 @@ const createApp = () => {
 
   const jobRepository = new InMemoryJobRepository();
   const applicationRepository = new InMemoryJobApplicationRepository();
-  const notificationPort = new NotificationClient();
+  const notificationPort = new ThrottledNotificationClient();
 
   const routes = createRoutes({
     jobRepository,

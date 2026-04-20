@@ -8,6 +8,10 @@ import { InMemoryJobRepository } from '../../src/infrastructure/repositories/in-
 const mockApplicationRepository: jest.Mocked<JobApplicationRepository> = {
   findByJobId: jest.fn(),
   save: jest.fn(),
+  archiveOldApplications: jest.fn(),
+  sendFollowUp: jest.fn(),
+  exportToCsv: jest.fn(),
+  getApplicantMetrics: jest.fn(),
 };
 
 const mockNotificationPort: jest.Mocked<NotificationPort> = {

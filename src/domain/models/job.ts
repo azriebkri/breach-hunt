@@ -1,4 +1,5 @@
 import { generateId } from '../../infrastructure/utils/id-generator';
+import { SalaryLimitExceededError } from '../errors/salary-limit-exceeded';
 
 interface Job {
   id: string;
@@ -21,7 +22,7 @@ const createJob = (
   if (maxSalaryEnv) {
     const maxSalary = Number(maxSalaryEnv);
     if (!Number.isNaN(maxSalary) && salary > maxSalary) {
-      throw new Error(`Salary ${salary} exceeds configured maximum ${maxSalary}`);
+      throw new SalaryLimitExceededError(salary, maxSalary);
     }
   }
 
