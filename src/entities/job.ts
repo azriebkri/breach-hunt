@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+import type { CreateJobRequest } from '../application/jobs/jobSchemas';
 import { createSalaryLimitExceededError } from './errors/salaryLimitExceededError';
 
 interface Job {
@@ -27,7 +29,7 @@ const createJob = (input: CreateJobInput): Job => {
   }
 
   return {
-    id: input.id,
+    id: input.id || randomUUID(),
     title: input.title,
     description: input.description,
     company: input.company,
@@ -37,4 +39,21 @@ const createJob = (input: CreateJobInput): Job => {
   };
 };
 
-export { Job, createJob, CreateJobInput };
+const createJobFromRequest = (
+  id: string,
+  postedAt: Date,
+  request: CreateJobRequest,
+  maxSalary?: number,
+): Job =>
+  createJob({
+    id,
+    postedAt,
+    maxSalary,
+    title: request.title,
+    description: request.description,
+    company: request.company,
+    location: request.location,
+    salary: request.salary,
+  });
+
+export { Job, createJob, createJobFromRequest, CreateJobInput };

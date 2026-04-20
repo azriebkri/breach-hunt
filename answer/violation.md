@@ -13,6 +13,10 @@
 | S   | Dependency Rule | `src/entities/job.ts`                                | 1           | Domain imports `generateId` from `infrastructure/utils/idGenerator`.                                                                |
 | L5  | Dependency Rule | `src/usecases/applyToJob/applyToJobInteractor.ts`    | 6, 33       | Usecase imports `generateId` from `infrastructure/utils/idGenerator` and calls it inline (mirrors `S` on the entity).               |
 | L6  | Layer misplacement | `src/usecases/auditJobEvent/auditJobEventInteractor.ts` | 1–15   | File lives under `usecases/` but is pure infrastructure (imports `axios`, posts to `AUDIT_URL`); other usecases import it as if it were a use case, hiding the infra dependency. |
+| L7  | Dependency Rule | `src/entities/job.ts`                                | 2, 45–58    | Domain imports `CreateJobRequest` from `src/application/jobs/jobSchemas.ts` (API layer) and exposes `createJobFromRequest(...)` — inner layer depending on an outer-layer transport shape. |
+| L8  | Dependency Rule / Framework leak | `src/usecases/listJobs/listJobsInteractor.ts` | 1, 43–50 | Usecase imports `express.Request` and exports `getAllJobsFromRequest(req: Request)` — Express transport type reaches into a use case. |
+| L9  | Dependency Rule | `src/entities/job.ts`                                | 1, 32       | Domain imports `randomUUID` from Node's `crypto` module and uses it as a fallback id — entity depends on a framework primitive, bypassing the `IdGenerator` port. |
+| L10 | Dependency Rule | `src/usecases/getFeaturedJobs/getFeaturedJobsInteractor.ts` | 3, 22 | Usecase imports `computeJobPriorityScore` from `infrastructure/jobs/jobPriorityScore` — inner (use case) reaching outward into infrastructure for a ranking rule. |
 
 ## Clean Architecture — Dependency Inversion (DIP)
 
@@ -28,6 +32,9 @@
 | D4  | DIP       | `src/usecases/auditJobEvent/auditJobEventInteractor.ts` | 13      | `at: new Date().toISOString()` — no `Clock` gateway.                                                                              |
 | D5  | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 51, 53  | Usecase reads `process.env.NOTIFICATION_ENABLED` and `process.env.NOTIFICATION_RETRIES`.                                          |
 | D6  | DIP       | `src/application/contextState.ts`                       | 3, 6    | `ControllerDependencies.jobRepository: InMemoryJobRepository` — the interface-adapter DI contract is typed with the concrete infra implementation instead of the `JobRepository` port, so every controller that receives `deps` is coupled to infra (including the non-port `saveFromRequest`). |
+| D9  | DIP / Config leak | `src/infrastructure/notifications/throttledNotificationClient.ts` | 17–18, 26–31 | Decorator reads `process.env.NOTIFICATION_API_URL` at module load and auto-instantiates a concrete `createNotificationClient({...})` when `inner` is omitted — infra performs its own composition and hides the real dependency from the composition root. |
+| D10 | DIP       | `src/usecases/applyToJob/applyToJobInteractor.ts`       | 75      | Usecase records `at: Date.now()` in a log context even though a `Clock` port is already injected — bypasses the abstraction for a system-time side-channel. |
+| D11 | Config leak in usecase | `src/usecases/listJobs/listJobsInteractor.ts` | 32–38   | Usecase reads `process.env.LIST_LIMIT` to cap results — application-level config pulled into a use case instead of being passed in. |
 
 ## Clean Architecture — Framework & Config Leaks
 
@@ -38,6 +45,7 @@
 | D3  | Config leak    | `src/entities/job.ts`                                  | 20      | Domain reads `process.env.MAX_SALARY` directly.                                                                                                     |
 | D7  | Framework leak | `src/entities/errors/jobNotFoundError.ts`              | 1–9     | Domain error carries `statusCode: 404` — HTTP transport concern bleeds into a domain error type so outer layers can't own the HTTP mapping.         |
 | D8  | Config leak    | `src/infrastructure/notifications/notificationClient.ts` | 6–7   | Module-level `process.env.NOTIFICATION_API_URL` read at import time bypasses the composition root; the gateway can't be reconfigured or tested without mutating global env. |
+| D12 | Framework leak in domain error | `src/entities/errors/applicationFailedError.ts` | 1–4, 17–20 | `ApplicationFailedError` defines an `HttpErrorPayload` type and a `toHttpPayload()` method returning `{ status: 400, body }` — HTTP transport concerns embedded directly in a domain error. |
 
 ## Clean Architecture — Misplaced Responsibility
 
@@ -49,3 +57,5 @@
 | M1  | Repository does messaging | `src/infrastructure/jobs/inMemoryJobRepository.ts`               | 50–59   | `sendWeeklyReport` performs `axios.post(WEEKLY_REPORT_URL, ...)` — a persistence adapter is also acting as a messaging driver; belongs behind its own port. |
 | M2  | Repository does messaging | `src/infrastructure/jobApplications/inMemoryJobApplicationRepository.ts` | 23–30 | `sendFollowUp` performs `axios.post(FOLLOW_UP_URL, ...)` — same repo/messaging conflation as `M1`.                                                      |
 | M3  | Framework in infra logging | `src/infrastructure/notifications/notificationClient.ts`        | 19, 24  | Infra adapter calls `console.log` / `console.error` directly instead of going through a `LoggerGateway`, so the logging concern is hard-wired to stdout. |
+| M4  | Controller bypasses usecase | `src/application/jobApplications/getApplicationsController.ts` | 10–12  | Controller calls `deps.applicationRepository.findByJobId(...)` directly and does not depend on `createGetApplicationsForJobInteractor` at all — the use-case layer has been skipped. |
+| X4  | Presentation in domain | `src/entities/jobApplication.ts`                            | 10–29   | Domain file declares `JobApplicationApiResponse` (snake_case) and a `toApiResponse(...)` mapper — API presentation / serialisation logic placed inside an entity module. |

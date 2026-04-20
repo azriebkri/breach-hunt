@@ -1,5 +1,6 @@
 import { JobRepository } from '../../entities/gateways/jobRepository';
 import { Job } from '../../entities/job';
+import { computeJobPriorityScore } from '../../infrastructure/jobs/jobPriorityScore';
 
 interface FeaturedJobsConfig {
   readonly highSalaryThreshold: number;
@@ -17,7 +18,7 @@ const createGetFeaturedJobsInteractor = (
     const jobs = await deps.jobRepository.findAll();
     return jobs
       .filter((job) => job.salary > deps.config.highSalaryThreshold)
-      .sort((a, b) => b.postedAt.getTime() - a.postedAt.getTime());
+      .sort((a, b) => computeJobPriorityScore(b) - computeJobPriorityScore(a));
   };
 
   return { getFeaturedJobs };

@@ -73,6 +73,7 @@ const createApplyToJobInteractor = (
           activity: 'notificationAttemptFailed',
           jobId,
           attempt: attempt + 1,
+          at: Date.now(),
           reason: (error as Error).message,
         });
       }
